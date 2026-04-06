@@ -8,7 +8,7 @@ from attack_vlm_repro.attack import run_attack_from_config
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the small caption-attack reproduction.")
+    parser = argparse.ArgumentParser(description="Run the small vision-language attack reproduction.")
     parser.add_argument("--config", required=True, help="Path to YAML config.")
     args = parser.parse_args()
 

@@ -52,6 +52,11 @@ def summarize_results(results: list[dict]) -> dict:
         summary["caption_success_rate"] = float(
             sum(1 for item in caption_items if item["caption_eval"]["caption_success"]) / len(caption_items)
         )
+    vqa_items = [item for item in results if item.get("vqa_eval") is not None]
+    if vqa_items:
+        summary["vqa_success_rate"] = float(
+            sum(1 for item in vqa_items if item["vqa_eval"]["vqa_success"]) / len(vqa_items)
+        )
     return summary
 
 
@@ -69,12 +74,17 @@ def write_item_csv(results: list[dict], path: str | Path) -> None:
         "caption_success",
         "clean_caption",
         "adversarial_caption",
+        "vqa_success",
+        "question",
+        "clean_answer",
+        "adversarial_answer",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for item in results:
             caption_eval = item.get("caption_eval") or {}
+            vqa_eval = item.get("vqa_eval") or {}
             writer.writerow(
                 {
                     "item_id": item["item_id"],
@@ -87,5 +97,9 @@ def write_item_csv(results: list[dict], path: str | Path) -> None:
                     "caption_success": caption_eval.get("caption_success"),
                     "clean_caption": caption_eval.get("clean_caption", ""),
                     "adversarial_caption": caption_eval.get("adversarial_caption", ""),
+                    "vqa_success": vqa_eval.get("vqa_success"),
+                    "question": vqa_eval.get("question", item.get("question", "")),
+                    "clean_answer": vqa_eval.get("clean_answer", ""),
+                    "adversarial_answer": vqa_eval.get("adversarial_answer", ""),
                 }
             )

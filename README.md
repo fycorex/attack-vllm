@@ -1,6 +1,6 @@
 # Small Reproduction: Transferable Adversarial Attacks on Black-Box Vision-Language Models
 
-This project is a **small, method-faithful reproduction** of the paper **Transferable Adversarial Attacks on Black-Box Vision-Language Models** for the **image-captioning setting only**, scaled to fit **1x RTX 4060 8GB**.
+This project is a **small, method-faithful reproduction** of the paper **Transferable Adversarial Attacks on Black-Box Vision-Language Models** for the **image-captioning setting**, with a **local VQA extension** added afterward, scaled to fit **1x RTX 4060 8GB**.
 
 Paper reference: https://arxiv.org/html/2505.01050v1
 
@@ -31,8 +31,12 @@ Paper reference: https://arxiv.org/html/2505.01050v1
 - local ImageFolder subset builder for ImageNet-style directory trees
 - optional third surrogate entry in config, disabled by default for 8GB safety
 
+### Added in Phase 3
+- local open-source VQA victim evaluation with `Salesforce/blip-vqa-base`
+- manifest support for VQA questions plus source/target answer keywords
+- JSON/CSV outputs with VQA success metrics alongside proxy/caption metrics
+
 ### Explicitly not included
-- VQA
 - OCR / receipt experiments
 - proprietary API evaluation
 - large VLM surrogate ensembles
@@ -47,6 +51,7 @@ Paper reference: https://arxiv.org/html/2505.01050v1
 - Positives / negatives per item: `8 / 8`
 - Sequential surrogate loading: enabled by default for memory safety
 - Caption victim: loaded sequentially by default for memory safety
+- VQA victim: loaded sequentially by default for memory safety
 - Tuned default attack schedule: `50` steps, `step_size=0.5/255`, `top_k=1`
 - Tuned default transform probabilities: Gaussian/crop/pad/JPEG each at `0.3`
 
@@ -62,7 +67,7 @@ pip install -r requirements.txt
 
 Downloaded models are now saved inside the project-local cache root:
 - `models/open_clip/` for surrogate checkpoints
-- `models/huggingface/` for caption-victim checkpoints
+- `models/huggingface/` for caption-victim and VQA-victim checkpoints
 
 The cache root is configured by `paths.model_cache_dir` in the YAML configs, which defaults to `models` in `configs/caption_attack_demo.yaml:2-5` and `configs/caption_attack_phase2.yaml:2-5`.
 
@@ -92,6 +97,15 @@ PYTHONPATH=src python scripts/run_caption_attack.py \
 ```
 
 Phase 2 writes both JSON and CSV outputs, including caption-victim fields.
+
+## Phase 3 VQA demo run
+
+```bash
+HF_HUB_DISABLE_XET=1 PYTHONPATH=src python scripts/run_caption_attack.py \
+  --config configs/caption_attack_phase2_vqa.yaml
+```
+
+Phase 3 adds VQA answers and `vqa_success_rate` to the run summary.
 
 ## Phase 2 paper-closer run
 
@@ -165,6 +179,8 @@ After a run, you should see:
 
 If the caption victim is enabled, each `metrics.json` also contains `caption_eval` fields and the run summary includes `caption_success_rate`.
 
+If the VQA victim is enabled, each `metrics.json` also contains `vqa_eval` fields and the run summary includes `vqa_success_rate`.
+
 ## Manifest format
 
 ```json
@@ -181,6 +197,9 @@ If the caption victim is enabled, each `metrics.json` also contains `caption_eva
       "target_label": "dog",
       "source_keywords": ["cat", "kitten"],
       "target_keywords": ["dog", "puppy"],
+      "question": "What is the main object in the image?",
+      "source_answer_keywords": ["cat", "kitten"],
+      "target_answer_keywords": ["dog", "puppy"],
       "positive_image_paths": [
         "/absolute/path/to/target_example_0.png"
       ],
@@ -227,6 +246,16 @@ The local captioning check is intentionally lightweight:
 - manifest keyword aliases are used because small captioners often say `car` instead of `automobile`
 
 This is more faithful than the Phase 1 proxy alone, but it is still a local approximation for 8GB hardware.
+
+## Notes on the Phase 3 VQA approximation
+
+The local VQA check is also lightweight:
+- victim model: `Salesforce/blip-vqa-base`
+- default question: `What is the main object in the image?`
+- evaluation rule: success when the adversarial answer contains a target answer keyword and, by default, no source answer keyword
+- the shipped smoke validation used `hf-internal-testing/tiny-random-BlipForQuestionAnswering` on CPU to validate the code path quickly
+
+This extends the project toward the paper's broader task scope, but it is still a small local approximation rather than the paper's full VQA benchmark.
 
 ## Plan
 

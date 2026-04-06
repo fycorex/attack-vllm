@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import json
 import re
@@ -20,6 +20,9 @@ class AttackItem:
     negative_image_paths: list[Path]
     source_keywords: list[str]
     target_keywords: list[str]
+    question: str | None = None
+    source_answer_keywords: list[str] = field(default_factory=list)
+    target_answer_keywords: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -59,6 +62,15 @@ def load_manifest(path: str | Path) -> AttackManifest:
                 negative_image_paths=[Path(p) for p in item["negative_image_paths"]],
                 source_keywords=normalize_keywords(item["source_label"], item.get("source_keywords")),
                 target_keywords=normalize_keywords(item["target_label"], item.get("target_keywords")),
+                question=item.get("question"),
+                source_answer_keywords=normalize_keywords(
+                    item["source_label"],
+                    item.get("source_answer_keywords") or item.get("source_keywords"),
+                ),
+                target_answer_keywords=normalize_keywords(
+                    item["target_label"],
+                    item.get("target_answer_keywords") or item.get("target_keywords"),
+                ),
             )
         )
     return AttackManifest(

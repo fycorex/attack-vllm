@@ -16,6 +16,7 @@ from .data import AttackItem, load_image_tensor, load_manifest, save_tensor_imag
 from .eval import evaluate_proxy, summarize_results, write_item_csv
 from .losses import visual_contrastive_loss
 from .surrogates import create_surrogate, unload_surrogate
+from .vqa_victim import VQAVictim
 
 
 def set_seed(seed: int) -> None:
@@ -39,6 +40,11 @@ class CaptionAttackRunner:
         self.caption_victim = (
             CaptionVictim(config.evaluation.caption_victim, cache_dir=self.model_cache_dir / "huggingface")
             if config.evaluation.caption_victim.enabled
+            else None
+        )
+        self.vqa_victim = (
+            VQAVictim(config.evaluation.vqa_victim, cache_dir=self.model_cache_dir / "huggingface")
+            if config.evaluation.vqa_victim.enabled
             else None
         )
 
@@ -127,6 +133,13 @@ class CaptionAttackRunner:
         adv_image = tensor_to_pil_image(adv[0])
         return self.caption_victim.evaluate(clean_image, adv_image, item)
 
+    def _vqa_eval(self, clean: torch.Tensor, adv: torch.Tensor, item: AttackItem) -> dict | None:
+        if self.vqa_victim is None:
+            return None
+        clean_image = tensor_to_pil_image(clean[0])
+        adv_image = tensor_to_pil_image(adv[0])
+        return self.vqa_victim.evaluate(clean_image, adv_image, item)
+
     def attack_item(self, item: AttackItem) -> dict:
         example_cache = self._precompute_example_embeddings(item)
         base_size = next(spec.input_size for spec in self.config.surrogates if spec.enabled)
@@ -198,6 +211,7 @@ class CaptionAttackRunner:
         final_adv = (clean + final_delta).clamp(0.0, 1.0)
         proxy_eval = self._ensemble_proxy_eval(clean, final_adv, example_cache)
         caption_eval = self._caption_eval(clean, final_adv, item)
+        vqa_eval = self._vqa_eval(clean, final_adv, item)
 
         item_dir = self.output_dir / item.item_id
         item_dir.mkdir(parents=True, exist_ok=True)
@@ -213,8 +227,12 @@ class CaptionAttackRunner:
             "target_label": item.target_label,
             "source_keywords": item.source_keywords,
             "target_keywords": item.target_keywords,
+            "question": item.question,
+            "source_answer_keywords": item.source_answer_keywords,
+            "target_answer_keywords": item.target_answer_keywords,
             "proxy_eval": proxy_eval,
             "caption_eval": caption_eval,
+            "vqa_eval": vqa_eval,
             "history": history,
         }
         (item_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -236,6 +254,8 @@ class CaptionAttackRunner:
         write_item_csv(results, self.output_dir / "items.csv")
         if self.caption_victim is not None:
             self.caption_victim.unload()
+        if self.vqa_victim is not None:
+            self.vqa_victim.unload()
         return summary
 
 

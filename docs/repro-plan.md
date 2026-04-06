@@ -128,6 +128,21 @@ The paper's image-captioning setting attacks an image whose main object belongs 
 - `src/attack_vlm_repro/caption_victim.py`
 - `src/attack_vlm_repro/ablations.py`
 
+### Phase 3: Local VQA extension
+**Status:** implemented as a post-v1 scope extension.
+
+**Goal:** extend the same attack pipeline to a lightweight local VQA victim without changing the core perturbation optimization method.
+
+**Delivered work**
+- add a BLIP VQA victim wrapper for local answer generation
+- extend the manifest with question and answer-keyword fields
+- add VQA result fields to per-item JSON/CSV outputs and run summaries
+- add a Phase 3 YAML config for local VQA runs
+
+**Additional files for Phase 3**
+- `configs/caption_attack_phase2_vqa.yaml`
+- `src/attack_vlm_repro/vqa_victim.py`
+
 ## Faithful-to-paper vs scaled-down vs approximated
 
 ### Faithful-to-paper parts

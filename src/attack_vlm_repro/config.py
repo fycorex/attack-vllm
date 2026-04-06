@@ -68,9 +68,23 @@ class CaptionVictimConfig:
 
 
 @dataclass
+class VQAVictimConfig:
+    enabled: bool = False
+    model_name: str = "Salesforce/blip-vqa-base"
+    device: str = "cuda"
+    use_fp16: bool = True
+    sequential_loading: bool = True
+    max_new_tokens: int = 10
+    num_beams: int = 3
+    question_fallback: str = "What is the main object in the image?"
+    require_source_absent: bool = True
+
+
+@dataclass
 class EvaluationConfig:
     success_margin_threshold: float = 0.0
     caption_victim: CaptionVictimConfig = field(default_factory=CaptionVictimConfig)
+    vqa_victim: VQAVictimConfig = field(default_factory=VQAVictimConfig)
 
 
 @dataclass
@@ -97,6 +111,7 @@ def load_config(path: str | Path) -> AttackConfig:
 
     evaluation_payload = payload.get("evaluation", {})
     caption_victim_payload = evaluation_payload.get("caption_victim", {})
+    vqa_victim_payload = evaluation_payload.get("vqa_victim", {})
 
     cfg = AttackConfig(
         experiment_name=payload.get("experiment_name", "caption-attack-demo"),
@@ -106,6 +121,7 @@ def load_config(path: str | Path) -> AttackConfig:
         evaluation=EvaluationConfig(
             success_margin_threshold=evaluation_payload.get("success_margin_threshold", 0.0),
             caption_victim=CaptionVictimConfig(**caption_victim_payload),
+            vqa_victim=VQAVictimConfig(**vqa_victim_payload),
         ),
         surrogates=[SurrogateConfig(**item) for item in payload.get("surrogates", [])],
     )
