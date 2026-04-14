@@ -98,6 +98,8 @@ def main() -> None:
                 "source_keywords": CIFAR10_KEYWORDS[source_name],
                 "target_keywords": CIFAR10_KEYWORDS[target_name],
                 "question": "What is the main object in the image?",
+                "source_answer_text": source_name,
+                "target_answer_text": target_name,
                 "source_answer_keywords": CIFAR10_KEYWORDS[source_name],
                 "target_answer_keywords": CIFAR10_KEYWORDS[target_name],
                 "positive_image_paths": positive_paths,

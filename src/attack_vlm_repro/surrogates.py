@@ -75,7 +75,9 @@ class SurrogateWrapper:
         images = self.apply_patch_drop(images, patch_drop_rate)
         images = self.normalize(images)
         with self.drop_path_context(drop_path_max_rate):
-            features = self.model.encode_image(images)
+            autocast_enabled = images.device.type == "cuda" and self.config.use_fp16
+            with torch.autocast(device_type=images.device.type, dtype=torch.float16, enabled=autocast_enabled):
+                features = self.model.encode_image(images)
         return F.normalize(features.float(), dim=-1)
 
 

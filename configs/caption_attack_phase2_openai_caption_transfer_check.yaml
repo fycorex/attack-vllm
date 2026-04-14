@@ -1,0 +1,76 @@
+experiment_name: caption-attack-phase2-openai-caption-transfer-check
+paths:
+  manifest: data/cifar10_caption_attack_car2truck_alt100_demo/manifest.json
+  output_dir: outputs/caption_attack_phase2_openai_caption_transfer_check
+  model_cache_dir: models
+runtime:
+  device: cuda
+  seed: 123
+  attack_limit: 1
+  attack_offset: 0
+  sequential_surrogates: true
+attack:
+  epsilon: 0.06274509803921569
+  step_size: 0.00196078431372549
+  steps: 50
+  temperature: 0.1
+  top_k: 1
+  relative_proxy_weight: 0.0
+  patch_drop_rate: 0.2
+  drop_path_max_rate: 0.1
+  perturbation_ema_decay: 0.99
+  gaussian_prob: 0.3
+  gaussian_scale_multiplier: 0.25
+  crop_prob: 0.3
+  crop_scale_min: 0.8
+  crop_scale_max: 1.0
+  crop_ratio_min: 0.75
+  crop_ratio_max: 1.3333333333
+  pad_prob: 0.3
+  jpeg_prob: 0.3
+  jpeg_quality_min: 0.5
+  jpeg_quality_max: 1.0
+  enable_patch_drop: true
+  enable_drop_path: true
+  enable_perturbation_ema: true
+  enable_gaussian: true
+  enable_crop: true
+  enable_pad: true
+  enable_jpeg: true
+evaluation:
+  success_margin_threshold: 0.0
+  caption_victim:
+    enabled: true
+    model_name: models/huggingface/manual_blip_image_captioning_base
+    device: cuda
+    use_fp16: true
+    sequential_loading: true
+    max_new_tokens: 24
+    num_beams: 3
+    prompt: "a photography of"
+    require_source_absent: true
+  vqa_victim:
+    enabled: false
+  gpt_victim:
+    enabled: false
+surrogates:
+  - model_name: ViT-B-32
+    pretrained: laion2b_s34b_b79k
+    input_size: 224
+    enabled: true
+  - model_name: ViT-B-16
+    pretrained: laion2b_s34b_b88k
+    input_size: 224
+    enabled: true
+  - model_name: RN50
+    pretrained: openai
+    input_size: 224
+    enabled: false
+  - model_name: RN101
+    pretrained: openai
+    input_size: 224
+    enabled: false
+  - model_name: ViT-L-14
+    pretrained: openai
+    input_size: 224
+    enabled: false

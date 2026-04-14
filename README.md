@@ -1,6 +1,6 @@
 # Small Reproduction: Transferable Adversarial Attacks on Black-Box Vision-Language Models
 
-This project is a **small, method-faithful reproduction** of the paper **Transferable Adversarial Attacks on Black-Box Vision-Language Models** for the **image-captioning setting**, with a **local VQA extension** added afterward, scaled to fit **1x RTX 4060 8GB**.
+This project is a **small, method-faithful reproduction** of the paper **Transferable Adversarial Attacks on Black-Box Vision-Language Models** for the **image-captioning setting**, with **local VQA and OCR extensions** added afterward, scaled to fit **1x RTX 4060 8GB**.
 
 Paper reference: https://arxiv.org/html/2505.01050v1
 
@@ -36,8 +36,14 @@ Paper reference: https://arxiv.org/html/2505.01050v1
 - manifest support for VQA questions plus source/target answer keywords
 - JSON/CSV outputs with VQA success metrics alongside proxy/caption metrics
 
+### Added in Phase 4
+- local OCR victim evaluation with Tesseract by default and optional TrOCR support
+- manifest support for source/target OCR keywords
+- JSON/CSV outputs with OCR success metrics alongside proxy/caption/VQA metrics
+- synthetic OCR-word demo builder for local smoke testing
+
 ### Explicitly not included
-- OCR / receipt experiments
+- the paper's full receipt/OCR benchmark
 - proprietary API evaluation
 - large VLM surrogate ensembles
 - full-scale paper numbers
@@ -61,6 +67,12 @@ Paper reference: https://arxiv.org/html/2505.01050v1
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+For the default OCR victim, also install the local Tesseract binary:
+
+```bash
+sudo apt-get update && sudo apt-get install -y tesseract-ocr
 ```
 
 ## Model download cache
@@ -107,6 +119,66 @@ HF_HUB_DISABLE_XET=1 PYTHONPATH=src python scripts/run_caption_attack.py \
 
 Phase 3 adds VQA answers and `vqa_success_rate` to the run summary.
 
+## GPT-4o / GPT-5 reproduction runs
+
+The paper reports `GPT-4o` and `GPT-4o mini`. For the current hosted reproduction path in this repo, the shipped configs target `openai/gpt-4o` and `openai/gpt-5` on GitHub Models, while keeping the same open-ended caption/VQA prompts plus a GPT-4o judge prompt modeled on the paper.
+
+Set a GitHub Models PAT first:
+
+```bash
+export OPENAI_API_KEY=...
+```
+
+Use the GitHub Models endpoint:
+- base URL: `https://models.github.ai/inference`
+- model IDs: `openai/gpt-4o`, `openai/gpt-5`
+
+Run all shipped GPT configs:
+
+```bash
+PYTHONPATH=src python scripts/run_openai_reproduction.py
+```
+
+Or run a single task/model pair:
+
+```bash
+PYTHONPATH=src python scripts/run_caption_attack.py \
+  --config configs/caption_attack_phase2_gpt4o_caption.yaml
+
+PYTHONPATH=src python scripts/run_caption_attack.py \
+  --config configs/caption_attack_phase2_gpt5_vqa.yaml
+```
+
+If you are using the official OpenAI API instead of GitHub Models, set `evaluation.gpt_victim.base_url` and `judge_base_url` back to `https://api.openai.com/v1`, and switch model IDs back to the OpenAI-style names you intend to use.
+
+GitHub Models may return `429` on short bursts. The repo now includes retry/backoff controls in the GPT config plus a replay utility for existing adversarial images:
+
+```bash
+PYTHONPATH=src python scripts/replay_gpt_eval.py \
+  --config configs/caption_attack_phase2_gpt4o_caption.yaml \
+  --metrics outputs/caption_attack_phase2_mixed4_localblip/item_03/metrics.json
+```
+
+## Phase 4 OCR demo preparation
+
+The OCR path uses a synthetic word-image smoke-test dataset by default.
+
+```bash
+PYTHONPATH=src python scripts/prepare_ocr_demo.py \
+  --output_dir data/ocr_word_attack_demo \
+  --num_items 4 \
+  --num_examples_per_class 8
+```
+
+## Phase 4 OCR demo run
+
+```bash
+PYTHONPATH=src python scripts/run_caption_attack.py \
+  --config configs/caption_attack_phase2_ocr.yaml
+```
+
+Phase 4 adds OCR text fields and `ocr_success_rate` to the run summary.
+
 ## Phase 2 paper-closer run
 
 For a more paper-like local run, prepare an ImageFolder subset with explicit source-target pairs and use the paper-closer config:
@@ -129,6 +201,21 @@ This profile moves closer to the paper by using:
 - `top_k=4`
 - a longer `100`-step attack schedule
 - an ImageFolder-style local dataset instead of the CIFAR-10 demo
+
+## Stronger GPU profile
+
+For a more aggressive local run on the RTX 4060 path, use the stronger GPU profile:
+
+```bash
+PYTHONPATH=src python scripts/run_caption_attack.py \
+  --config configs/caption_attack_phase2_gpu_stronger.yaml
+```
+
+This profile uses:
+- `5` cached surrogate models (`ViT-B-32`, `ViT-B-16`, `RN50`, `RN101`, `ViT-L-14`)
+- `4` stochastic augmentation batches per optimization step
+- `120` attack steps with `top_k=4`
+- TF32/cuDNN benchmark enabled when CUDA is available
 
 Example `pairs.json` schema:
 
@@ -181,6 +268,8 @@ If the caption victim is enabled, each `metrics.json` also contains `caption_eva
 
 If the VQA victim is enabled, each `metrics.json` also contains `vqa_eval` fields and the run summary includes `vqa_success_rate`.
 
+If the GPT victim is enabled, each `metrics.json` also contains `gpt_eval` fields and the run summary includes `gpt_success_rate`.
+
 ## Manifest format
 
 ```json
@@ -198,6 +287,8 @@ If the VQA victim is enabled, each `metrics.json` also contains `vqa_eval` field
       "source_keywords": ["cat", "kitten"],
       "target_keywords": ["dog", "puppy"],
       "question": "What is the main object in the image?",
+      "source_answer_text": "cat",
+      "target_answer_text": "dog",
       "source_answer_keywords": ["cat", "kitten"],
       "target_answer_keywords": ["dog", "puppy"],
       "positive_image_paths": [
@@ -237,6 +328,7 @@ If the VQA victim is enabled, each `metrics.json` also contains `vqa_eval` field
 - differentiable JPEG implemented as a straight-through approximation
 - PatchDrop implemented via patch masking when native support is unavailable
 - caption success judged by keyword matching against generated captions, not human evaluation
+- GPT runs use small local CIFAR/ImageFolder subsets instead of the paper's larger captioning and LLaVA-Bench benchmarks
 
 ## Notes on the Phase 2 caption-victim approximation
 
@@ -256,6 +348,14 @@ The local VQA check is also lightweight:
 - the shipped smoke validation used `hf-internal-testing/tiny-random-BlipForQuestionAnswering` on CPU to validate the code path quickly
 
 This extends the project toward the paper's broader task scope, but it is still a small local approximation rather than the paper's full VQA benchmark.
+
+## Notes on the GPT reproduction path
+
+The GPT-backed configs are closer to the paper than the local BLIP checks, but they still remain scaled down:
+- captioning uses the paper-style caption prompt and a GPT-4o A/B/C/D judge
+- VQA uses open-ended answers and a GPT-4o True/False judge prompt matching the paper's evaluation style
+- the paper's smaller victim was `GPT-4o mini`; this repo uses `gpt-5-mini` as the current substitute
+- the attack side still uses this repo's smaller surrogate ensemble and local manifests, not the paper's full 8-CLIP and benchmark setup
 
 ## Plan
 

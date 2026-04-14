@@ -24,7 +24,12 @@ class VQAVictim:
     def _load(self) -> None:
         if self._processor is not None and self._model is not None:
             return
-        from transformers import BlipForQuestionAnswering, BlipProcessor
+        try:
+            from transformers import BlipForQuestionAnswering, BlipProcessor
+        except ImportError as exc:
+            raise RuntimeError(
+                "VQA victim requires the transformers package. Install project requirements first with: pip install -r requirements.txt"
+            ) from exc
 
         cache_dir = str(self.cache_dir) if self.cache_dir is not None else None
         self._processor = BlipProcessor.from_pretrained(self.config.model_name, cache_dir=cache_dir)

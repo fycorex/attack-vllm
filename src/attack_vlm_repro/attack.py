@@ -14,7 +14,9 @@ from .caption_victim import CaptionVictim
 from .config import AttackConfig, load_config
 from .data import AttackItem, load_image_tensor, load_manifest, save_tensor_image, tensor_to_pil_image
 from .eval import evaluate_proxy, summarize_results, write_item_csv
-from .losses import visual_contrastive_loss
+from .losses import relative_proxy_loss, visual_contrastive_loss
+from .ocr_victim import OCRVictim
+from .gpt_victim import GPTVictim
 from .surrogates import create_surrogate, unload_surrogate
 from .vqa_victim import VQAVictim
 
@@ -27,6 +29,17 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def _accumulate_step_metrics(target: dict[str, float], metrics: dict[str, float]) -> None:
+    for key, value in metrics.items():
+        target[key] = target.get(key, 0.0) + float(value)
+
+
+def _average_step_metrics(total: dict[str, float], count: int) -> dict[str, float]:
+    if count <= 1:
+        return total
+    return {key: value / float(count) for key, value in total.items()}
+
+
 class CaptionAttackRunner:
     def __init__(self, config: AttackConfig):
         self.config = config
@@ -36,6 +49,10 @@ class CaptionAttackRunner:
         self.model_cache_dir = Path(config.paths.model_cache_dir)
         self.model_cache_dir.mkdir(parents=True, exist_ok=True)
         set_seed(config.runtime.seed)
+        if torch.cuda.is_available():
+            torch.backends.cuda.matmul.allow_tf32 = config.runtime.enable_tf32
+            torch.backends.cudnn.allow_tf32 = config.runtime.enable_tf32
+            torch.backends.cudnn.benchmark = config.runtime.cudnn_benchmark
         self.surrogates = []
         self.caption_victim = (
             CaptionVictim(config.evaluation.caption_victim, cache_dir=self.model_cache_dir / "huggingface")
@@ -47,6 +64,12 @@ class CaptionAttackRunner:
             if config.evaluation.vqa_victim.enabled
             else None
         )
+        self.ocr_victim = (
+            OCRVictim(config.evaluation.ocr_victim, cache_dir=self.model_cache_dir / "huggingface")
+            if config.evaluation.ocr_victim.enabled
+            else None
+        )
+        self.gpt_victim = GPTVictim(config.evaluation.gpt_victim) if config.evaluation.gpt_victim.enabled else None
 
     def load_surrogates(self) -> None:
         load_device = self.device if not self.config.runtime.sequential_surrogates else "cpu"
@@ -78,9 +101,12 @@ class CaptionAttackRunner:
             with torch.no_grad():
                 pos_emb = surrogate.encode_image(pos_batch).cpu()
                 neg_emb = surrogate.encode_image(neg_batch).cpu()
+                clean_input = load_image_tensor(item.image_path, size).unsqueeze(0).to(self.device)
+                clean_emb = surrogate.encode_image(clean_input).cpu()
             example_cache[surrogate.name] = {
                 "positive_embeddings": pos_emb,
                 "negative_embeddings": neg_emb,
+                "clean_embedding": clean_emb,
             }
             if self.config.runtime.sequential_surrogates:
                 unload_surrogate(surrogate)
@@ -140,6 +166,20 @@ class CaptionAttackRunner:
         adv_image = tensor_to_pil_image(adv[0])
         return self.vqa_victim.evaluate(clean_image, adv_image, item)
 
+    def _ocr_eval(self, clean: torch.Tensor, adv: torch.Tensor, item: AttackItem) -> dict | None:
+        if self.ocr_victim is None:
+            return None
+        clean_image = tensor_to_pil_image(clean[0])
+        adv_image = tensor_to_pil_image(adv[0])
+        return self.ocr_victim.evaluate(clean_image, adv_image, item)
+
+    def _gpt_eval(self, clean: torch.Tensor, adv: torch.Tensor, item: AttackItem) -> dict | None:
+        if self.gpt_victim is None:
+            return None
+        clean_image = tensor_to_pil_image(clean[0])
+        adv_image = tensor_to_pil_image(adv[0])
+        return self.gpt_victim.evaluate(clean_image, adv_image, item)
+
     def attack_item(self, item: AttackItem) -> dict:
         example_cache = self._precompute_example_embeddings(item)
         base_size = next(spec.input_size for spec in self.config.surrogates if spec.enabled)
@@ -150,6 +190,7 @@ class CaptionAttackRunner:
         history = []
         patch_drop_rate = self.config.attack.patch_drop_rate if self.config.attack.enable_patch_drop else 0.0
         drop_path_max_rate = self.config.attack.drop_path_max_rate if self.config.attack.enable_drop_path else 0.0
+        augmentation_batches = max(1, int(self.config.attack.augmentation_batches))
 
         for step in tqdm(range(self.config.attack.steps), desc=f"attack:{item.item_id}", leave=False):
             if delta.grad is not None:
@@ -159,29 +200,45 @@ class CaptionAttackRunner:
             step_metrics = {}
 
             for surrogate in self.surrogates:
-                bounded_delta = delta.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)
-                adv = (clean + bounded_delta).clamp(0.0, 1.0)
                 if self.config.runtime.sequential_surrogates:
                     self._move_surrogate(surrogate, self.device)
-                surrogate_input = self._resize_for_surrogate(adv, surrogate.config.input_size)
-                surrogate_input = pipeline(surrogate_input, self.config.attack.epsilon)
                 positive_embeddings = example_cache[surrogate.name]["positive_embeddings"].to(self.device)
                 negative_embeddings = example_cache[surrogate.name]["negative_embeddings"].to(self.device)
-                embeddings = surrogate.encode_image(
-                    surrogate_input,
-                    patch_drop_rate=patch_drop_rate,
-                    drop_path_max_rate=drop_path_max_rate,
-                )
-                loss, metrics = visual_contrastive_loss(
-                    embeddings,
-                    positive_embeddings,
-                    negative_embeddings,
-                    temperature=self.config.attack.temperature,
-                    top_k=self.config.attack.top_k,
-                )
-                loss.backward()
-                total_loss_value += float(loss.detach().cpu())
-                step_metrics[surrogate.name] = metrics
+                clean_reference_embeddings = example_cache[surrogate.name]["clean_embedding"].to(self.device)
+                surrogate_metrics_total: dict[str, float] = {}
+
+                for _ in range(augmentation_batches):
+                    bounded_delta = delta.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)
+                    adv = (clean + bounded_delta).clamp(0.0, 1.0)
+                    surrogate_input = self._resize_for_surrogate(adv, surrogate.config.input_size)
+                    surrogate_input = pipeline(surrogate_input, self.config.attack.epsilon)
+                    embeddings = surrogate.encode_image(
+                        surrogate_input,
+                        patch_drop_rate=patch_drop_rate,
+                        drop_path_max_rate=drop_path_max_rate,
+                    )
+                    loss, metrics = visual_contrastive_loss(
+                        embeddings,
+                        positive_embeddings,
+                        negative_embeddings,
+                        temperature=self.config.attack.temperature,
+                        top_k=self.config.attack.top_k,
+                    )
+                    if self.config.attack.relative_proxy_weight > 0.0:
+                        relative_loss, relative_metrics = relative_proxy_loss(
+                            clean_reference_embeddings,
+                            embeddings,
+                            positive_embeddings,
+                            negative_embeddings,
+                            top_k=self.config.attack.top_k,
+                        )
+                        loss = loss + (self.config.attack.relative_proxy_weight * relative_loss)
+                        metrics.update(relative_metrics)
+                    (loss / float(augmentation_batches)).backward()
+                    total_loss_value += float(loss.detach().cpu()) / float(augmentation_batches)
+                    _accumulate_step_metrics(surrogate_metrics_total, metrics)
+
+                step_metrics[surrogate.name] = _average_step_metrics(surrogate_metrics_total, augmentation_batches)
                 if self.config.runtime.sequential_surrogates:
                     unload_surrogate(surrogate)
 
@@ -212,6 +269,8 @@ class CaptionAttackRunner:
         proxy_eval = self._ensemble_proxy_eval(clean, final_adv, example_cache)
         caption_eval = self._caption_eval(clean, final_adv, item)
         vqa_eval = self._vqa_eval(clean, final_adv, item)
+        ocr_eval = self._ocr_eval(clean, final_adv, item)
+        gpt_eval = self._gpt_eval(clean, final_adv, item)
 
         item_dir = self.output_dir / item.item_id
         item_dir.mkdir(parents=True, exist_ok=True)
@@ -228,11 +287,17 @@ class CaptionAttackRunner:
             "source_keywords": item.source_keywords,
             "target_keywords": item.target_keywords,
             "question": item.question,
+            "source_answer_text": item.source_answer_text,
+            "target_answer_text": item.target_answer_text,
             "source_answer_keywords": item.source_answer_keywords,
             "target_answer_keywords": item.target_answer_keywords,
+            "source_text_keywords": item.source_text_keywords,
+            "target_text_keywords": item.target_text_keywords,
             "proxy_eval": proxy_eval,
             "caption_eval": caption_eval,
             "vqa_eval": vqa_eval,
+            "ocr_eval": ocr_eval,
+            "gpt_eval": gpt_eval,
             "history": history,
         }
         (item_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -241,7 +306,9 @@ class CaptionAttackRunner:
     def run(self) -> dict:
         manifest = load_manifest(self.config.paths.manifest)
         self.load_surrogates()
-        items = manifest.items if self.config.runtime.attack_limit is None else manifest.items[: self.config.runtime.attack_limit]
+        items = manifest.items[self.config.runtime.attack_offset :]
+        if self.config.runtime.attack_limit is not None:
+            items = items[: self.config.runtime.attack_limit]
         results = [self.attack_item(item) for item in items]
         summary_metrics = summarize_results(results)
         summary = {
@@ -256,6 +323,10 @@ class CaptionAttackRunner:
             self.caption_victim.unload()
         if self.vqa_victim is not None:
             self.vqa_victim.unload()
+        if self.ocr_victim is not None:
+            self.ocr_victim.unload()
+        if self.gpt_victim is not None:
+            self.gpt_victim.unload()
         return summary
 
 

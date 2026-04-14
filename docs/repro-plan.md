@@ -143,6 +143,22 @@ The paper's image-captioning setting attacks an image whose main object belongs 
 - `configs/caption_attack_phase2_vqa.yaml`
 - `src/attack_vlm_repro/vqa_victim.py`
 
+### Phase 4: Local OCR extension
+**Status:** implemented as a post-v1 scope extension.
+
+**Goal:** extend the same attack pipeline to a lightweight local OCR victim for text-bearing images without changing the core perturbation optimization method.
+
+**Delivered work**
+- add a local OCR victim wrapper supporting Tesseract and optional TrOCR
+- extend the manifest with source and target OCR keyword fields
+- add OCR result fields to per-item JSON/CSV outputs and run summaries
+- add a synthetic OCR-word demo builder and a Phase 4 YAML config for local OCR runs
+
+**Additional files for Phase 4**
+- `configs/caption_attack_phase2_ocr.yaml`
+- `scripts/prepare_ocr_demo.py`
+- `src/attack_vlm_repro/ocr_victim.py`
+
 ## Faithful-to-paper vs scaled-down vs approximated
 
 ### Faithful-to-paper parts

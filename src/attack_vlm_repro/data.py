@@ -21,8 +21,12 @@ class AttackItem:
     source_keywords: list[str]
     target_keywords: list[str]
     question: str | None = None
+    source_answer_text: str | None = None
+    target_answer_text: str | None = None
     source_answer_keywords: list[str] = field(default_factory=list)
     target_answer_keywords: list[str] = field(default_factory=list)
+    source_text_keywords: list[str] = field(default_factory=list)
+    target_text_keywords: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -63,6 +67,8 @@ def load_manifest(path: str | Path) -> AttackManifest:
                 source_keywords=normalize_keywords(item["source_label"], item.get("source_keywords")),
                 target_keywords=normalize_keywords(item["target_label"], item.get("target_keywords")),
                 question=item.get("question"),
+                source_answer_text=item.get("source_answer_text"),
+                target_answer_text=item.get("target_answer_text"),
                 source_answer_keywords=normalize_keywords(
                     item["source_label"],
                     item.get("source_answer_keywords") or item.get("source_keywords"),
@@ -70,6 +76,14 @@ def load_manifest(path: str | Path) -> AttackManifest:
                 target_answer_keywords=normalize_keywords(
                     item["target_label"],
                     item.get("target_answer_keywords") or item.get("target_keywords"),
+                ),
+                source_text_keywords=normalize_keywords(
+                    item["source_label"],
+                    item.get("source_text_keywords") or item.get("source_keywords"),
+                ),
+                target_text_keywords=normalize_keywords(
+                    item["target_label"],
+                    item.get("target_text_keywords") or item.get("target_keywords"),
                 ),
             )
         )

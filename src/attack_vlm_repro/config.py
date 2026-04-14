@@ -14,6 +14,7 @@ class SurrogateConfig:
     input_size: int = 224
     enabled: bool = True
     patch_size: int | None = None
+    use_fp16: bool = True
 
 
 @dataclass
@@ -21,8 +22,10 @@ class AttackHyperParams:
     epsilon: float = 16.0 / 255.0
     step_size: float = 1.0 / 255.0
     steps: int = 20
+    augmentation_batches: int = 1
     temperature: float = 0.1
     top_k: int = 4
+    relative_proxy_weight: float = 0.0
     patch_drop_rate: float = 0.20
     drop_path_max_rate: float = 0.10
     perturbation_ema_decay: float = 0.99
@@ -51,7 +54,10 @@ class RuntimeConfig:
     device: str = "cuda"
     seed: int = 123
     attack_limit: int | None = 4
+    attack_offset: int = 0
     sequential_surrogates: bool = True
+    enable_tf32: bool = True
+    cudnn_benchmark: bool = True
 
 
 @dataclass
@@ -81,10 +87,55 @@ class VQAVictimConfig:
 
 
 @dataclass
+class OCRVictimConfig:
+    enabled: bool = False
+    backend: str = "tesseract"
+    model_name: str = "microsoft/trocr-small-printed"
+    device: str = "cuda"
+    use_fp16: bool = True
+    sequential_loading: bool = True
+    max_new_tokens: int = 16
+    num_beams: int = 1
+    tesseract_psm: int = 7
+    require_source_absent: bool = True
+
+
+@dataclass
+class GPTVictimConfig:
+    enabled: bool = False
+    model_name: str = "gpt-4o"
+    task_type: str = "vqa"
+    api_mode: str = "auto"
+    prompt_mode: str = "freeform"
+    success_mode: str = "keyword"
+    question_fallback: str = "What is the main object in the image?"
+    caption_prompt: str = "Provide a concise description of the image using no more than three sentences."
+    require_source_absent: bool = True
+    max_output_tokens: int = 64
+    temperature: float = 0.0
+    reasoning_effort: str | None = None
+    api_key_env: str = "OPENAI_API_KEY"
+    base_url: str = "https://api.openai.com/v1"
+    request_timeout_seconds: int = 90
+    max_retries: int = 4
+    retry_backoff_seconds: float = 10.0
+    request_pause_seconds: float = 0.0
+    judge_model_name: str = "gpt-4o"
+    judge_api_mode: str = "auto"
+    judge_max_output_tokens: int = 128
+    judge_temperature: float = 0.0
+    judge_reasoning_effort: str | None = None
+    judge_api_key_env: str = "OPENAI_API_KEY"
+    judge_base_url: str = "https://api.openai.com/v1"
+
+
+@dataclass
 class EvaluationConfig:
     success_margin_threshold: float = 0.0
     caption_victim: CaptionVictimConfig = field(default_factory=CaptionVictimConfig)
     vqa_victim: VQAVictimConfig = field(default_factory=VQAVictimConfig)
+    ocr_victim: OCRVictimConfig = field(default_factory=OCRVictimConfig)
+    gpt_victim: GPTVictimConfig = field(default_factory=GPTVictimConfig)
 
 
 @dataclass
@@ -112,6 +163,8 @@ def load_config(path: str | Path) -> AttackConfig:
     evaluation_payload = payload.get("evaluation", {})
     caption_victim_payload = evaluation_payload.get("caption_victim", {})
     vqa_victim_payload = evaluation_payload.get("vqa_victim", {})
+    ocr_victim_payload = evaluation_payload.get("ocr_victim", {})
+    gpt_victim_payload = evaluation_payload.get("gpt_victim", {})
 
     cfg = AttackConfig(
         experiment_name=payload.get("experiment_name", "caption-attack-demo"),
@@ -122,6 +175,8 @@ def load_config(path: str | Path) -> AttackConfig:
             success_margin_threshold=evaluation_payload.get("success_margin_threshold", 0.0),
             caption_victim=CaptionVictimConfig(**caption_victim_payload),
             vqa_victim=VQAVictimConfig(**vqa_victim_payload),
+            ocr_victim=OCRVictimConfig(**ocr_victim_payload),
+            gpt_victim=GPTVictimConfig(**gpt_victim_payload),
         ),
         surrogates=[SurrogateConfig(**item) for item in payload.get("surrogates", [])],
     )

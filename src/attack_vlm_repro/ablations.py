@@ -36,6 +36,9 @@ def apply_ablation(config: AttackConfig, variant: str) -> AttackConfig:
         return cfg
     if name == "proxy_only":
         cfg.evaluation.caption_victim.enabled = False
+        cfg.evaluation.vqa_victim.enabled = False
+        cfg.evaluation.ocr_victim.enabled = False
+        cfg.evaluation.gpt_victim.enabled = False
         return cfg
     raise ValueError(f"Unknown ablation variant: {variant}")
 
