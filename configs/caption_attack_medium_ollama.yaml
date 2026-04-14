@@ -1,0 +1,48 @@
+# Medium configuration with 3 diverse surrogates for RTX 4060
+experiment_name: "medium-ollama-transfer"
+
+paths:
+  manifest: "data/cifar10_caption_attack_demo/manifest.json"
+  output_dir: "outputs/medium_ollama_transfer"
+  model_cache_dir: "models"
+
+runtime:
+  device: "cuda"
+  seed: 42
+  attack_limit: 4
+  sequential_surrogates: true
+  enable_tf32: true
+  cudnn_benchmark: true
+
+attack:
+  epsilon: 16.0
+  step_size: 1.0
+  steps: 100
+  augmentation_batches: 2
+  temperature: 0.1
+  top_k: 4
+  patch_drop_rate: 0.20
+  drop_path_max_rate: 0.10
+  perturbation_ema_decay: 0.99
+  enable_patch_drop: true
+  enable_drop_path: true
+  enable_perturbation_ema: true
+
+surrogates:
+  # 3 diverse architectures (ViT + ResNet)
+  - model_name: "ViT-B-32"
+    pretrained: "laion2b_s34b_b79k"
+    input_size: 224
+    enabled: true
+  - model_name: "RN50"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-L-14"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+
+evaluation:
+  ollama_victim:
+    enabled: false  # Will run separately to save GPU memory

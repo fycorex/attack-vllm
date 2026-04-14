@@ -1,0 +1,50 @@
+# Strong attack configuration for better transfer
+experiment_name: "strong-ollama-transfer"
+
+paths:
+  manifest: "data/cifar10_caption_attack_demo/manifest.json"
+  output_dir: "outputs/strong_ollama_transfer"
+  model_cache_dir: "models"
+
+runtime:
+  device: "cuda"
+  seed: 42
+  attack_limit: 4
+  sequential_surrogates: true
+  enable_tf32: true
+  cudnn_benchmark: true
+
+attack:
+  epsilon: 32.0  # Higher perturbation budget
+  step_size: 2.0
+  steps: 200
+  augmentation_batches: 4
+  temperature: 0.05  # Lower temperature for sharper loss
+  top_k: 4
+  patch_drop_rate: 0.30
+  drop_path_max_rate: 0.15
+  perturbation_ema_decay: 0.99
+  enable_patch_drop: true
+  enable_drop_path: true
+  enable_perturbation_ema: true
+  enable_gaussian: true
+  enable_crop: true
+  enable_jpeg: true
+
+surrogates:
+  - model_name: "ViT-B-32"
+    pretrained: "laion2b_s34b_b79k"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-B-16"
+    pretrained: "laion2b_s34b_b88k"
+    input_size: 224
+    enabled: true
+  - model_name: "RN50"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+
+evaluation:
+  ollama_victim:
+    enabled: false  # Run separately
