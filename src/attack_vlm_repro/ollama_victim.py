@@ -92,10 +92,6 @@ class OllamaVictim:
             "prompt": prompt,
             "images": [image_b64],
             "stream": False,
-            "options": {
-                "num_predict": self.config.max_tokens,
-                "temperature": self.config.temperature,
-            }
         }).encode("utf-8")
 
         last_error = None
