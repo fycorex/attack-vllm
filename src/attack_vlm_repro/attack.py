@@ -17,6 +17,8 @@ from .eval import evaluate_proxy, summarize_results, write_item_csv
 from .losses import relative_proxy_loss, visual_contrastive_loss
 from .ocr_victim import OCRVictim
 from .gpt_victim import GPTVictim
+from .ollama_victim import OllamaVictim
+from .qwen_vl_victim import QwenVLVictim
 from .surrogates import create_surrogate, unload_surrogate
 from .vqa_victim import VQAVictim
 
@@ -70,6 +72,12 @@ class CaptionAttackRunner:
             else None
         )
         self.gpt_victim = GPTVictim(config.evaluation.gpt_victim) if config.evaluation.gpt_victim.enabled else None
+        self.ollama_victim = OllamaVictim(config.evaluation.ollama_victim) if config.evaluation.ollama_victim.enabled else None
+        self.qwen_vl_victim = (
+            QwenVLVictim(config.evaluation.qwen_vl_victim, cache_dir=self.model_cache_dir / "huggingface")
+            if config.evaluation.qwen_vl_victim.enabled
+            else None
+        )
 
     def _write_effective_config(self) -> None:
         payload = config_to_dict(self.config)
@@ -195,6 +203,20 @@ class CaptionAttackRunner:
         adv_image = tensor_to_pil_image(adv[0])
         return self.gpt_victim.evaluate(clean_image, adv_image, item)
 
+    def _ollama_eval(self, clean: torch.Tensor, adv: torch.Tensor, item: AttackItem) -> dict | None:
+        if self.ollama_victim is None:
+            return None
+        clean_image = tensor_to_pil_image(clean[0])
+        adv_image = tensor_to_pil_image(adv[0])
+        return self.ollama_victim.evaluate(clean_image, adv_image, item)
+
+    def _qwen_vl_eval(self, clean: torch.Tensor, adv: torch.Tensor, item: AttackItem) -> dict | None:
+        if self.qwen_vl_victim is None:
+            return None
+        clean_image = tensor_to_pil_image(clean[0])
+        adv_image = tensor_to_pil_image(adv[0])
+        return self.qwen_vl_victim.evaluate(clean_image, adv_image, item)
+
     def attack_item(self, item: AttackItem) -> dict:
         example_cache = self._precompute_example_embeddings(item)
         base_size = next(spec.input_size for spec in self.config.surrogates if spec.enabled)
@@ -288,6 +310,8 @@ class CaptionAttackRunner:
         vqa_eval = self._safe_eval("vqa", "vqa_success", lambda: self._vqa_eval(clean, final_adv, item))
         ocr_eval = self._safe_eval("ocr", "ocr_success", lambda: self._ocr_eval(clean, final_adv, item))
         gpt_eval = self._safe_eval("gpt", "gpt_success", lambda: self._gpt_eval(clean, final_adv, item))
+        ollama_eval = self._safe_eval("ollama", "ollama_success", lambda: self._ollama_eval(clean, final_adv, item))
+        qwen_vl_eval = self._safe_eval("qwen_vl", "qwen_vl_success", lambda: self._qwen_vl_eval(clean, final_adv, item))
 
         item_dir = self.output_dir / item.item_id
         item_dir.mkdir(parents=True, exist_ok=True)
@@ -315,6 +339,8 @@ class CaptionAttackRunner:
             "vqa_eval": vqa_eval,
             "ocr_eval": ocr_eval,
             "gpt_eval": gpt_eval,
+            "ollama_eval": ollama_eval,
+            "qwen_vl_eval": qwen_vl_eval,
             "history": history,
         }
         (item_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -353,6 +379,10 @@ class CaptionAttackRunner:
             self.ocr_victim.unload()
         if self.gpt_victim is not None:
             self.gpt_victim.unload()
+        if self.ollama_victim is not None:
+            self.ollama_victim.unload()
+        if self.qwen_vl_victim is not None:
+            self.qwen_vl_victim.unload()
         return summary
 
 

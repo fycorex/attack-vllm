@@ -1,0 +1,59 @@
+# Heavy A6000 configuration with ollama victim
+experiment_name: "a6000-ollama-transfer"
+
+paths:
+  manifest: "data/cifar10_caption_attack_demo/manifest.json"
+  output_dir: "outputs/a6000_ollama_transfer"
+  model_cache_dir: "models"
+
+runtime:
+  device: "cuda"
+  seed: 42
+  attack_limit: 20
+  sequential_surrogates: true
+  enable_tf32: true
+  cudnn_benchmark: true
+
+attack:
+  epsilon: 16.0
+  step_size: 1.0
+  steps: 200
+  augmentation_batches: 4
+  temperature: 0.1
+  top_k: 4
+  patch_drop_rate: 0.20
+  drop_path_max_rate: 0.10
+  perturbation_ema_decay: 0.99
+  enable_patch_drop: true
+  enable_drop_path: true
+  enable_perturbation_ema: true
+
+surrogates:
+  - model_name: "ViT-B-32"
+    pretrained: "laion2b_s34b_b79k"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-B-16"
+    pretrained: "laion2b_s34b_b88k"
+    input_size: 224
+    enabled: true
+  - model_name: "RN50"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+  - model_name: "RN101"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-L-14"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+
+evaluation:
+  ollama_victim:
+    enabled: true
+    model_name: "qwen3-vl:4b"
+    base_url: "http://localhost:11434"
+    task_type: "vqa"
+    require_source_absent: true

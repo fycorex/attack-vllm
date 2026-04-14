@@ -1,0 +1,39 @@
+# Light test configuration with ollama victim
+experiment_name: "ollama-test"
+
+paths:
+  manifest: "data/cifar10_caption_attack_demo/manifest.json"
+  output_dir: "outputs/ollama_test"
+  model_cache_dir: "models"
+
+runtime:
+  device: "cuda"
+  seed: 42
+  attack_limit: 2
+  sequential_surrogates: true
+
+attack:
+  epsilon: 16.0
+  step_size: 1.0
+  steps: 10
+  augmentation_batches: 1
+  temperature: 0.1
+  top_k: 4
+
+surrogates:
+  - model_name: "ViT-B-32"
+    pretrained: "laion2b_s34b_b79k"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-B-16"
+    pretrained: "laion2b_s34b_b88k"
+    input_size: 224
+    enabled: true
+
+evaluation:
+  ollama_victim:
+    enabled: true
+    model_name: "qwen3-vl:4b"
+    base_url: "http://localhost:11434"
+    task_type: "vqa"
+    require_source_absent: true

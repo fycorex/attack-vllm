@@ -11,6 +11,8 @@ VICTIM_SUMMARY_SPECS = [
     ("vqa_eval", "vqa_success", "vqa_success_rate", "vqa_eval_count", "vqa"),
     ("ocr_eval", "ocr_success", "ocr_success_rate", "ocr_eval_count", "ocr"),
     ("gpt_eval", "gpt_success", "gpt_success_rate", "gpt_eval_count", "gpt"),
+    ("ollama_eval", "ollama_success", "ollama_success_rate", "ollama_eval_count", "ollama"),
+    ("qwen_vl_eval", "qwen_vl_success", "qwen_vl_success_rate", "qwen_vl_eval_count", "qwen_vl"),
 ]
 
 
@@ -168,6 +170,30 @@ def summarize_results(results: list[dict]) -> dict:
             summary[rate_key] = float(sum(1 for item in eval_items if item[eval_key][success_key]) / len(eval_items))
     summary.update(summarize_campaign_transfer(results))
     return summary
+
+
+def calculate_campaign_asr(results: list[dict], victim_type: str) -> dict:
+    """Calculate Attack Success Rate for a specific victim type."""
+    eval_key = f"{victim_type}_eval"
+    success_key = f"{victim_type}_success"
+
+    completed = [
+        r for r in results
+        if r.get(eval_key) is not None and not r.get(eval_key, {}).get("evaluation_failed")
+    ]
+    failed = [
+        r for r in results
+        if r.get(eval_key, {}).get("evaluation_failed")
+    ]
+    successes = sum(1 for r in completed if r.get(eval_key, {}).get(success_key, False))
+
+    return {
+        "total_items": len(results),
+        "completed_evaluations": len(completed),
+        "failed_evaluations": len(failed),
+        "successful_attacks": successes,
+        "asr": successes / len(completed) if completed else 0.0,
+    }
 
 
 def write_item_csv(results: list[dict], path: str | Path) -> None:

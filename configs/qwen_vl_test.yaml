@@ -1,0 +1,41 @@
+# Light test configuration with HuggingFace QwenVL victim (fallback)
+experiment_name: "qwen-vl-test"
+
+paths:
+  manifest: "data/cifar10_caption_attack_demo/manifest.json"
+  output_dir: "outputs/qwen_vl_test"
+  model_cache_dir: "models"
+
+runtime:
+  device: "cuda"
+  seed: 42
+  attack_limit: 2
+  sequential_surrogates: true
+
+attack:
+  epsilon: 16.0
+  step_size: 1.0
+  steps: 10
+  augmentation_batches: 1
+  temperature: 0.1
+  top_k: 4
+
+surrogates:
+  - model_name: "ViT-B-32"
+    pretrained: "laion2b_s34b_b79k"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-B-16"
+    pretrained: "laion2b_s34b_b88k"
+    input_size: 224
+    enabled: true
+
+evaluation:
+  qwen_vl_victim:
+    enabled: true
+    model_name: "Qwen/Qwen2-VL-2B-Instruct"
+    device: "cuda"
+    use_fp16: true
+    max_new_tokens: 64
+    sequential_loading: true
+    require_source_absent: true

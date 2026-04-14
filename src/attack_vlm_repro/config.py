@@ -133,12 +133,45 @@ class GPTVictimConfig:
 
 
 @dataclass
+class OllamaVictimConfig:
+    """Configuration for local ollama VLM victim (e.g., QwenVL)."""
+    enabled: bool = False
+    model_name: str = "qwen3-vl:4b"
+    base_url: str = "http://localhost:11434"
+    api_endpoint: str = "api/generate"
+    task_type: str = "vqa"
+    max_tokens: int = 128
+    temperature: float = 0.0
+    question_fallback: str = "What is the main object in the image?"
+    require_source_absent: bool = True
+    health_check_timeout: float = 5.0
+    request_timeout: float = 60.0
+    max_retries: int = 3
+    retry_backoff: float = 2.0
+
+
+@dataclass
+class HuggingFaceQwenVLConfig:
+    """Configuration for HuggingFace QwenVL victim as fallback."""
+    enabled: bool = False
+    model_name: str = "Qwen/Qwen2-VL-2B-Instruct"
+    device: str = "cuda"
+    use_fp16: bool = True
+    max_new_tokens: int = 64
+    sequential_loading: bool = True
+    question_fallback: str = "What is the main object in the image?"
+    require_source_absent: bool = True
+
+
+@dataclass
 class EvaluationConfig:
     success_margin_threshold: float = 0.0
     caption_victim: CaptionVictimConfig = field(default_factory=CaptionVictimConfig)
     vqa_victim: VQAVictimConfig = field(default_factory=VQAVictimConfig)
     ocr_victim: OCRVictimConfig = field(default_factory=OCRVictimConfig)
     gpt_victim: GPTVictimConfig = field(default_factory=GPTVictimConfig)
+    ollama_victim: OllamaVictimConfig = field(default_factory=OllamaVictimConfig)
+    qwen_vl_victim: HuggingFaceQwenVLConfig = field(default_factory=HuggingFaceQwenVLConfig)
 
 
 @dataclass
@@ -261,6 +294,8 @@ def load_config(path: str | Path) -> AttackConfig:
     vqa_victim_payload = evaluation_payload.get("vqa_victim", {})
     ocr_victim_payload = evaluation_payload.get("ocr_victim", {})
     gpt_victim_payload = evaluation_payload.get("gpt_victim", {})
+    ollama_victim_payload = evaluation_payload.get("ollama_victim", {})
+    qwen_vl_victim_payload = evaluation_payload.get("qwen_vl_victim", {})
 
     cfg = AttackConfig(
         experiment_name=payload.get("experiment_name", "caption-attack-demo"),
@@ -273,6 +308,8 @@ def load_config(path: str | Path) -> AttackConfig:
             vqa_victim=VQAVictimConfig(**vqa_victim_payload),
             ocr_victim=OCRVictimConfig(**ocr_victim_payload),
             gpt_victim=GPTVictimConfig(**gpt_victim_payload),
+            ollama_victim=OllamaVictimConfig(**ollama_victim_payload),
+            qwen_vl_victim=HuggingFaceQwenVLConfig(**qwen_vl_victim_payload),
         ),
         surrogates=[SurrogateConfig(**item) for item in payload.get("surrogates", [])],
     )
