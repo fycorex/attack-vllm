@@ -42,10 +42,14 @@ Paper reference: https://arxiv.org/html/2505.01050v1
 - JSON/CSV outputs with OCR success metrics alongside proxy/caption/VQA metrics
 - synthetic OCR-word demo builder for local smoke testing
 
+### Added in Phase 5
+- `--profile light|heavy|api` runtime profiles for smoke, A6000-class, and API-transfer runs
+- `effective_config.json` saved with each run so profile overlays are auditable
+- campaign-level transfer reporting over the attacked image group
+- skipped and failed victim evaluations counted separately from completed-evaluation ASR
+
 ### Explicitly not included
 - the paper's full receipt/OCR benchmark
-- proprietary API evaluation
-- large VLM surrogate ensembles
 - full-scale paper numbers
 
 ## Hardware-aware defaults
@@ -60,6 +64,24 @@ Paper reference: https://arxiv.org/html/2505.01050v1
 - VQA victim: loaded sequentially by default for memory safety
 - Tuned default attack schedule: `50` steps, `step_size=0.5/255`, `top_k=1`
 - Tuned default transform probabilities: Gaussian/crop/pad/JPEG each at `0.3`
+
+## Runtime profiles
+
+Use `--profile` to choose the run shape:
+
+```bash
+PYTHONPATH=src python scripts/run_caption_attack.py \
+  --config configs/caption_attack_phase2.yaml \
+  --profile light
+```
+
+- `light`: smoke-friendly run, first two surrogates, sequential loading, one augmentation batch, up to four attacked images.
+- `heavy`: A6000-oriented run with `ViT-B-32`, `ViT-B-16`, `RN50`, `RN101`, and `ViT-L-14`, at least `120` steps, four augmentation batches, and TF32/cuDNN benchmark enabled.
+- `api`: enables GPT-backed victim evaluation for transfer checks. Replay remains available through `scripts/replay_gpt_eval.py` when you already have adversarial images.
+
+`--verbose` only prints resolved run details. It does not select `light`, `heavy`, or `api`.
+
+Every run writes `outputs/<run_name>/effective_config.json`. Use that file to audit the exact surrogate ensemble and profile overrides used for a result.
 
 ## Install
 
@@ -143,10 +165,12 @@ Or run a single task/model pair:
 
 ```bash
 PYTHONPATH=src python scripts/run_caption_attack.py \
-  --config configs/caption_attack_phase2_gpt4o_caption.yaml
+  --config configs/caption_attack_phase2_gpt4o_caption.yaml \
+  --profile api
 
 PYTHONPATH=src python scripts/run_caption_attack.py \
-  --config configs/caption_attack_phase2_gpt5_vqa.yaml
+  --config configs/caption_attack_phase2_gpt5_vqa.yaml \
+  --profile api
 ```
 
 If you are using the official OpenAI API instead of GitHub Models, set `evaluation.gpt_victim.base_url` and `judge_base_url` back to `https://api.openai.com/v1`, and switch model IDs back to the OpenAI-style names you intend to use.
@@ -204,11 +228,12 @@ This profile moves closer to the paper by using:
 
 ## Stronger GPU profile
 
-For a more aggressive local run on the RTX 4060 path, use the stronger GPU profile:
+For a more aggressive local run on A6000-class hardware, use the heavy profile:
 
 ```bash
 PYTHONPATH=src python scripts/run_caption_attack.py \
-  --config configs/caption_attack_phase2_gpu_stronger.yaml
+  --config configs/caption_attack_phase2.yaml \
+  --profile heavy
 ```
 
 This profile uses:
@@ -258,6 +283,7 @@ PYTHONPATH=src python scripts/prepare_imagefolder_subset.py \
 
 After a run, you should see:
 - `outputs/<run_name>/summary.json`
+- `outputs/<run_name>/effective_config.json`
 - `outputs/<run_name>/items.csv`
 - `outputs/<run_name>/item_XX/clean.png`
 - `outputs/<run_name>/item_XX/adversarial.png`
@@ -269,6 +295,14 @@ If the caption victim is enabled, each `metrics.json` also contains `caption_eva
 If the VQA victim is enabled, each `metrics.json` also contains `vqa_eval` fields and the run summary includes `vqa_success_rate`.
 
 If the GPT victim is enabled, each `metrics.json` also contains `gpt_eval` fields and the run summary includes `gpt_success_rate`.
+
+The run summary also includes a `campaign` section and a `transfer` section. The transfer attack success rate is computed per victim/task over the group of attacked images:
+
+- numerator: completed evaluations marked successful for that victim/task
+- denominator: completed evaluations for that victim/task
+- skipped and failed evaluations: reported separately and not silently folded into the denominator
+
+Proxy, local victim, and API victim results are separated under `transfer.proxy`, `transfer.local_victims`, and `transfer.api_victims`.
 
 ## Manifest format
 

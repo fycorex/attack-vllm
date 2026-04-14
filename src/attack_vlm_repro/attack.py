@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from .augmentations import AttackAugmentationPipeline
 from .caption_victim import CaptionVictim
-from .config import AttackConfig, load_config
+from .config import AttackConfig, config_to_dict, enabled_surrogate_names, load_config
 from .data import AttackItem, load_image_tensor, load_manifest, save_tensor_image, tensor_to_pil_image
 from .eval import evaluate_proxy, summarize_results, write_item_csv
 from .losses import relative_proxy_loss, visual_contrastive_loss
@@ -70,6 +70,21 @@ class CaptionAttackRunner:
             else None
         )
         self.gpt_victim = GPTVictim(config.evaluation.gpt_victim) if config.evaluation.gpt_victim.enabled else None
+
+    def _write_effective_config(self) -> None:
+        payload = config_to_dict(self.config)
+        (self.output_dir / "effective_config.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _safe_eval(self, label: str, success_key: str, fn) -> dict | None:
+        try:
+            return fn()
+        except Exception as exc:
+            return {
+                success_key: False,
+                "evaluation_failed": True,
+                "error": str(exc),
+                "evaluation_label": label,
+            }
 
     def load_surrogates(self) -> None:
         load_device = self.device if not self.config.runtime.sequential_surrogates else "cpu"
@@ -267,10 +282,12 @@ class CaptionAttackRunner:
         final_delta = delta_ema.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)
         final_adv = (clean + final_delta).clamp(0.0, 1.0)
         proxy_eval = self._ensemble_proxy_eval(clean, final_adv, example_cache)
-        caption_eval = self._caption_eval(clean, final_adv, item)
-        vqa_eval = self._vqa_eval(clean, final_adv, item)
-        ocr_eval = self._ocr_eval(clean, final_adv, item)
-        gpt_eval = self._gpt_eval(clean, final_adv, item)
+        caption_eval = self._safe_eval(
+            "caption", "caption_success", lambda: self._caption_eval(clean, final_adv, item)
+        )
+        vqa_eval = self._safe_eval("vqa", "vqa_success", lambda: self._vqa_eval(clean, final_adv, item))
+        ocr_eval = self._safe_eval("ocr", "ocr_success", lambda: self._ocr_eval(clean, final_adv, item))
+        gpt_eval = self._safe_eval("gpt", "gpt_success", lambda: self._gpt_eval(clean, final_adv, item))
 
         item_dir = self.output_dir / item.item_id
         item_dir.mkdir(parents=True, exist_ok=True)
@@ -305,6 +322,7 @@ class CaptionAttackRunner:
 
     def run(self) -> dict:
         manifest = load_manifest(self.config.paths.manifest)
+        self._write_effective_config()
         self.load_surrogates()
         items = manifest.items[self.config.runtime.attack_offset :]
         if self.config.runtime.attack_limit is not None:
@@ -314,6 +332,14 @@ class CaptionAttackRunner:
         summary = {
             "experiment_name": self.config.experiment_name,
             "dataset_name": manifest.dataset_name,
+            "run_profile": self.config.run_profile,
+            "profile_metadata": self.config.profile_metadata,
+            "effective_config_path": str(self.output_dir / "effective_config.json"),
+            "ensemble": {
+                "enabled_surrogate_count": len(enabled_surrogate_names(self.config)),
+                "enabled_surrogates": enabled_surrogate_names(self.config),
+                "sequential_surrogates": self.config.runtime.sequential_surrogates,
+            },
             **summary_metrics,
             "items": results,
         }

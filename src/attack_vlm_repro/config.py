@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 import json
 
 import yaml
+
+
+SUPPORTED_PROFILES = ("light", "heavy", "api")
 
 
 @dataclass
@@ -153,6 +156,99 @@ class AttackConfig:
     attack: AttackHyperParams = field(default_factory=AttackHyperParams)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     surrogates: list[SurrogateConfig] = field(default_factory=list)
+    run_profile: str = "custom"
+    profile_metadata: dict = field(default_factory=dict)
+
+
+def config_to_dict(config: AttackConfig) -> dict:
+    return asdict(config)
+
+
+def enabled_surrogate_names(config: AttackConfig) -> list[str]:
+    return [f"{item.model_name}:{item.pretrained}" for item in config.surrogates if item.enabled]
+
+
+def _clip_first_heavy_surrogates() -> list[SurrogateConfig]:
+    return [
+        SurrogateConfig(model_name="ViT-B-32", pretrained="laion2b_s34b_b79k", input_size=224),
+        SurrogateConfig(model_name="ViT-B-16", pretrained="laion2b_s34b_b88k", input_size=224),
+        SurrogateConfig(model_name="RN50", pretrained="openai", input_size=224),
+        SurrogateConfig(model_name="RN101", pretrained="openai", input_size=224),
+        SurrogateConfig(model_name="ViT-L-14", pretrained="openai", input_size=224),
+    ]
+
+
+def apply_profile(config: AttackConfig, profile: str | None) -> None:
+    if profile is None:
+        config.run_profile = "custom"
+        config.profile_metadata = {
+            "profile": "custom",
+            "description": "Config-only run; no runtime profile overlay applied.",
+            "enabled_surrogates": enabled_surrogate_names(config),
+        }
+        return
+
+    normalized = profile.strip().lower()
+    if normalized not in SUPPORTED_PROFILES:
+        raise ValueError(f"Unsupported profile: {profile}. Expected one of: {', '.join(SUPPORTED_PROFILES)}")
+
+    config.run_profile = normalized
+    applied_overrides: dict[str, object] = {}
+    if normalized == "light":
+        if config.runtime.attack_limit is None:
+            config.runtime.attack_limit = 4
+        else:
+            config.runtime.attack_limit = min(config.runtime.attack_limit, 4)
+        config.attack.steps = min(config.attack.steps, 50)
+        config.attack.augmentation_batches = 1
+        for idx, surrogate in enumerate(config.surrogates):
+            surrogate.enabled = idx < 2
+        config.runtime.sequential_surrogates = True
+        applied_overrides = {
+            "runtime.attack_limit": config.runtime.attack_limit,
+            "attack.steps_max": 50,
+            "attack.augmentation_batches": 1,
+            "surrogate_policy": "first_two_enabled",
+            "runtime.sequential_surrogates": True,
+        }
+    elif normalized == "heavy":
+        config.surrogates = _clip_first_heavy_surrogates()
+        if config.runtime.attack_limit is None:
+            config.runtime.attack_limit = 8
+        else:
+            config.runtime.attack_limit = max(config.runtime.attack_limit, 8)
+        config.attack.steps = max(config.attack.steps, 120)
+        config.attack.augmentation_batches = max(config.attack.augmentation_batches, 4)
+        config.attack.top_k = max(config.attack.top_k, 4)
+        config.runtime.enable_tf32 = True
+        config.runtime.cudnn_benchmark = True
+        config.runtime.sequential_surrogates = True
+        applied_overrides = {
+            "surrogate_policy": "clip_first_a6000_heavy",
+            "runtime.attack_limit_min": 8,
+            "attack.steps_min": 120,
+            "attack.augmentation_batches_min": 4,
+            "attack.top_k_min": 4,
+            "runtime.enable_tf32": True,
+            "runtime.cudnn_benchmark": True,
+            "runtime.sequential_surrogates": True,
+        }
+    elif normalized == "api":
+        config.evaluation.gpt_victim.enabled = True
+        config.evaluation.gpt_victim.api_mode = config.evaluation.gpt_victim.api_mode or "auto"
+        config.evaluation.gpt_victim.success_mode = config.evaluation.gpt_victim.success_mode or "judge"
+        config.runtime.sequential_surrogates = True
+        applied_overrides = {
+            "evaluation.gpt_victim.enabled": True,
+            "runtime.sequential_surrogates": True,
+            "workflow_note": "API profile enables live GPT victim evaluation for this runner; replay remains a separate companion script.",
+        }
+
+    config.profile_metadata = {
+        "profile": normalized,
+        "applied_overrides": applied_overrides,
+        "enabled_surrogates": enabled_surrogate_names(config),
+    }
 
 
 def load_config(path: str | Path) -> AttackConfig:
@@ -185,4 +281,5 @@ def load_config(path: str | Path) -> AttackConfig:
             SurrogateConfig(model_name="ViT-B-32", pretrained="laion2b_s34b_b79k", input_size=224),
             SurrogateConfig(model_name="ViT-B-16", pretrained="laion2b_s34b_b88k", input_size=224),
         ]
+    apply_profile(cfg, None)
     return cfg

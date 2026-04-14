@@ -159,6 +159,26 @@ The paper's image-captioning setting attacks an image whose main object belongs 
 - `scripts/prepare_ocr_demo.py`
 - `src/attack_vlm_repro/ocr_victim.py`
 
+### Phase 5: Transfer-first profiles and campaign reporting
+**Status:** implemented as an operational upgrade.
+
+**Goal:** foreground the paper's main contribution: targeted transfer from open-source surrogate ensembles to held-out local and API-backed black-box victims over a group of attacked images.
+
+**Delivered work**
+- add `--profile light|heavy|api` to the main runner
+- keep `--verbose` as a detail/logging flag, not a profile selector
+- save `effective_config.json` for every run so profile overlays remain reproducible
+- expose an A6000-oriented heavy profile with a five-model CLIP-first surrogate pool
+- add additive `campaign` and `transfer` summary sections with proxy, local-victim, and API-victim metrics separated
+- define transfer ASR per victim/task over completed evaluations, with skipped and failed evaluations counted separately
+
+**Additional files touched for Phase 5**
+- `scripts/run_caption_attack.py`
+- `src/attack_vlm_repro/config.py`
+- `src/attack_vlm_repro/attack.py`
+- `src/attack_vlm_repro/eval.py`
+- `README.md`
+
 ## Faithful-to-paper vs scaled-down vs approximated
 
 ### Faithful-to-paper parts
@@ -170,9 +190,10 @@ The paper's image-captioning setting attacks an image whose main object belongs 
 - DropPath, PatchDrop, perturbation averaging hooks
 - Gaussian noise, crop, pad, resize, differentiable JPEG pipeline
 - source-label to target-label image-caption attack framing
+- campaign-level transfer reporting over multiple attacked images
 
 ### Scaled-down parts
-- 2 small CLIP-like surrogates instead of large ensembles
+- 2 small CLIP-like surrogates for light/default runs; 5 CLIP-like surrogates for A6000-heavy runs instead of the paper's full-scale ensemble
 - 224 input size
 - 4-image demo attack set
 - 8 positives / 8 negatives per attacked image
