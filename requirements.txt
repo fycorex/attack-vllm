@@ -1,5 +1,8 @@
-torch>=2.2
-torchvision>=0.17
+# Pin PyTorch to CUDA 12.8 wheels; unpinned installs currently resolve to CUDA 13.
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
 open_clip_torch>=2.24.0
 transformers>=4.46
 PyYAML>=6.0
