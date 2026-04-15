@@ -1,6 +1,6 @@
 # Paper-aligned config: arXiv:2505.01050v1
 # 8 CLIP models as per paper Table 3 (achieves 94.4% on GPT-4o)
-# Surrogate models aligned with paper Section 3.2
+# Default: ViT-SigLIP (3) + ViT-H (4) + ConvNeXt (1) per paper Section 3.2
 experiment_name: "paper-full"
 
 paths:
@@ -12,7 +12,7 @@ runtime:
   device: "cuda"
   seed: 42
   attack_limit: 50
-  sequential_surrogates: true  # Set to false on A6000
+  sequential_surrogates: true  # Set to false on A6000 with more VRAM
   enable_tf32: true
   cudnn_benchmark: true
 
@@ -40,50 +40,44 @@ attack:
   enable_jpeg: true
   jpeg_prob: 0.2
 
-# 8 CLIP models - paper Table 3 & Section 3.2
-# Note: Add ConvNeXt and SigLIP models if available
+# 8 CLIP models - paper Table 3 with SigLIP + ViT-H + ConvNeXt
+# Paper Section 3.2: 4x ViT-H + 3x ViT-SigLIP + 1x ConvNeXt XXL
 surrogates:
-  # ViT-B variants (from paper)
-  - model_name: "ViT-B-32"
-    pretrained: "laion2b_s34b_b79k"
-    input_size: 224
-    enabled: true
-  - model_name: "ViT-B-16"
-    pretrained: "laion2b_s34b_b88k"
-    input_size: 224
-    enabled: true
-  # ViT-L variants
-  - model_name: "ViT-L-14"
-    pretrained: "openai"
-    input_size: 224
-    enabled: true
-  - model_name: "ViT-L-14-336"
-    pretrained: "openai"
-    input_size: 336
-    enabled: true
-  # ViT-H variants (from paper)
+  # ViT-H variants (4 from paper)
   - model_name: "ViT-H-14"
     pretrained: "laion2b_s32b_b79k"
     input_size: 224
     enabled: true
-  - model_name: "ViT-bigG-14"
-    pretrained: "laion2b_s39b_b160k"
+  - model_name: "ViT-H-14"
+    pretrained: "metaclip_fullcc"
     input_size: 224
     enabled: true
-  # ResNet variants
-  - model_name: "RN50"
-    pretrained: "openai"
+  - model_name: "ViT-H-14"
+    pretrained: "metaclip_altogether"
     input_size: 224
     enabled: true
-  - model_name: "RN101"
-    pretrained: "openai"
+  - model_name: "ViT-H-14-378"
+    pretrained: "dfn5b"
+    input_size: 378
+    enabled: true
+  # ViT-SigLIP variants (3 from paper)
+  - model_name: "ViT-B-16-SigLIP"
+    pretrained: "webli"
     input_size: 224
     enabled: true
-
-# Optional additional models for A6000:
-# - ConvNeXt-XXL (paper mentions)
-# - ViT-SigLIP variants (paper mentions)
-# Add these if GPU memory allows
+  - model_name: "ViT-B-16-SigLIP-384"
+    pretrained: "webli"
+    input_size: 384
+    enabled: true
+  - model_name: "ViT-L-16-SigLIP"
+    pretrained: "webli"
+    input_size: 224
+    enabled: true
+  # ConvNeXt XXL (1 from paper)
+  - model_name: "convnext_xxlarge"
+    pretrained: "laion2b_s34b_b82k_augreg"
+    input_size: 224
+    enabled: true
 
 evaluation:
   ollama_victim:
