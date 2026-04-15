@@ -11,8 +11,12 @@
 set -e
 
 # Configuration
-export PYTHONPATH=src:$PYTHONPATH
-VENV=".venv"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+export PYTHONPATH="$PROJECT_ROOT/src:${PYTHONPATH:-}"
+VENV="$PROJECT_ROOT/.venv"
 
 # Colors
 RED='\033[0;31m'
@@ -33,7 +37,10 @@ setup_environment() {
     # Create venv if not exists
     if [ ! -d "$VENV" ]; then
         log_info "Creating virtual environment..."
-        python3 -m venv "$VENV"
+        if ! python3 -m venv "$VENV"; then
+            log_error "Failed to create virtual environment at $VENV"
+            exit 1
+        fi
     fi
 
     # Check activation
