@@ -18,6 +18,10 @@ cd "$PROJECT_ROOT"
 export PYTHONPATH="$PROJECT_ROOT/src:${PYTHONPATH:-}"
 VENV="$PROJECT_ROOT/.venv"
 VENV_PYTHON="$VENV/bin/python"
+DEFAULT_ATTACK_CONFIG="configs/caption_attack_paper.yaml"
+DEFAULT_OUTPUT_DIR="outputs/paper_caltech"
+DEFAULT_ITEMS=50
+DEFAULT_STEPS=300
 
 # Colors
 RED='\033[0;31m'
@@ -201,14 +205,43 @@ prepare_dataset() {
 
     source "$VENV/bin/activate"
 
+    REQUESTED_ITEMS=${1:-$DEFAULT_ITEMS}
+    MANIFEST_PATH="data/caltech_large/manifest.json"
+
     # Option 1: Use existing dataset
-    if [ -d "data/caltech_large" ]; then
-        log_info "Using existing Caltech101 dataset"
+    if [ -f "$MANIFEST_PATH" ]; then
+        EXISTING_ITEMS=$("$VENV_PYTHON" - "$MANIFEST_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print(0)
+else:
+    print(len(payload.get("items", [])))
+PY
+)
+    else
+        EXISTING_ITEMS=0
+    fi
+
+    if [ "$EXISTING_ITEMS" -ge "$REQUESTED_ITEMS" ]; then
+        log_info "Using existing Caltech101 dataset with $EXISTING_ITEMS items"
         export DATASET="caltech_large"
     else
-        # Option 2: Prepare 50-item dataset (paper uses 50 images)
-        log_info "Preparing Caltech101 dataset (50 items, N=50)..."
-        python scripts/prepare_caltech_demo.py --output_dir data/caltech_large --num_items 50 --num_examples 50
+        # Option 2: Prepare requested demo dataset size.
+        if [ "$EXISTING_ITEMS" -gt 0 ]; then
+            log_warn "Existing Caltech101 manifest has $EXISTING_ITEMS items; regenerating $REQUESTED_ITEMS items"
+        else
+            log_info "Preparing Caltech101 dataset ($REQUESTED_ITEMS items)..."
+        fi
+        python scripts/prepare_caltech_demo.py \
+            --output_dir data/caltech_large \
+            --num_items "$REQUESTED_ITEMS" \
+            --num_examples 50
         export DATASET="caltech_large"
     fi
 
@@ -223,9 +256,13 @@ run_attack() {
 
     source "$VENV/bin/activate"
 
-    CONFIG=${1:-configs/caption_attack_paper.yaml}
-    ITEMS=${2:-50}
-    STEPS=${3:-300}
+    CONFIG=${1:-$DEFAULT_ATTACK_CONFIG}
+    ITEMS=${2:-$DEFAULT_ITEMS}
+    STEPS=${3:-$DEFAULT_STEPS}
+
+    log_info "Attack config: $CONFIG"
+    log_info "Attack items: $ITEMS"
+    log_info "Attack steps: $STEPS"
 
     python scripts/run_caption_attack.py \
         --config "$CONFIG" \
@@ -236,7 +273,45 @@ run_attack() {
 }
 
 # =============================================================================
-# Step 5: Evaluate with SJTU API
+# Step 5: Evaluate with GPT Replay Matrix
+# =============================================================================
+evaluate_gpt_matrix() {
+    log_info "Evaluating replay matrix with TechUtopia GPT models..."
+
+    source "$VENV/bin/activate"
+
+    OUTPUT_DIR=${1:-$DEFAULT_OUTPUT_DIR}
+    METRICS_GLOB=${2:-"$OUTPUT_DIR/item_*/metrics.json"}
+    export TECHUTOPIA_API_KEY="${TECHUTOPIA_API_KEY:-sk-test}"
+
+    mkdir -p "$OUTPUT_DIR"
+
+    local configs=(
+        "gpt4o:configs/techutopia_gpt4o_caption_eval.yaml"
+        "gpt5mini:configs/techutopia_gpt5mini_caption_eval.yaml"
+    )
+
+    log_info "Eval output: $OUTPUT_DIR"
+    log_info "Metrics glob: $METRICS_GLOB"
+
+    for entry in "${configs[@]}"; do
+        local name="${entry%%:*}"
+        local config="${entry#*:}"
+        local result_path="$OUTPUT_DIR/eval_${name}.jsonl"
+
+        log_info "Running $name eval with $config"
+        python scripts/replay_gpt_eval.py \
+            --config "$config" \
+            --glob "$METRICS_GLOB" \
+            > "$result_path"
+        log_info "Saved $name results to $result_path"
+    done
+
+    log_info "GPT replay matrix complete"
+}
+
+# =============================================================================
+# Optional: Evaluate with SJTU API
 # =============================================================================
 evaluate_sjtu() {
     log_info "Evaluating with SJTU Qwen3VL API..."
@@ -273,11 +348,21 @@ run_full_experiment() {
 
     setup_environment
     download_models
-    prepare_dataset
+    prepare_dataset "$DEFAULT_ITEMS"
     run_attack "$@"
-    evaluate_sjtu
+    evaluate_gpt_matrix
 
     log_info "Full experiment complete!"
+}
+
+run_full_matrix() {
+    log_info "Starting 50x300 attack plus GPT eval matrix..."
+
+    prepare_dataset "${2:-$DEFAULT_ITEMS}"
+    run_attack "${1:-$DEFAULT_ATTACK_CONFIG}" "${2:-$DEFAULT_ITEMS}" "${3:-$DEFAULT_STEPS}"
+    evaluate_gpt_matrix "${4:-$DEFAULT_OUTPUT_DIR}"
+
+    log_info "50x300 attack plus GPT eval matrix complete"
 }
 
 # =============================================================================
@@ -299,12 +384,19 @@ case "${1:-}" in
     evaluate)
         evaluate_sjtu "${2:-}" "${3:-}"
         ;;
+    eval-gpt|evaluate-gpt|matrix)
+        evaluate_gpt_matrix "${2:-}" "${3:-}"
+        ;;
+    full-matrix)
+        shift
+        run_full_matrix "$@"
+        ;;
     full)
         shift
         run_full_experiment "$@"
         ;;
     *)
-        echo "Usage: $0 {setup|download|dataset|attack|evaluate|full}"
+        echo "Usage: $0 {setup|download|dataset|attack|evaluate|eval-gpt|full-matrix|full}"
         echo ""
         echo "Commands:"
         echo "  setup           - Set up Python environment"
@@ -312,11 +404,14 @@ case "${1:-}" in
         echo "  dataset         - Prepare 50-item dataset"
         echo "  attack [cfg] [n] [s] - Run attack (config, items, steps)"
         echo "  evaluate [out] [key] - Evaluate with SJTU API"
-        echo "  full            - Run complete pipeline"
+        echo "  eval-gpt [out] [glob] - Replay GPT-4o and GPT-5-mini eval matrix"
+        echo "  full-matrix [cfg] [n] [s] [out] - Run 50x300 attack plus GPT eval matrix"
+        echo "  full            - Run setup, downloads, attack, and GPT eval matrix"
         echo ""
         echo "Examples:"
-        echo "  $0 full                                    # Full pipeline"
+        echo "  $0 full-matrix                             # 50 items x 300 steps + GPT eval matrix"
         echo "  $0 attack configs/caption_attack_paper.yaml 50 300"
+        echo "  $0 eval-gpt outputs/paper_caltech"
         echo "  $0 evaluate outputs/paper_caltech"
         exit 1
         ;;

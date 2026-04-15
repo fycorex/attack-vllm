@@ -25,7 +25,10 @@ class AttackHyperParams:
     epsilon: float = 16.0 / 255.0
     step_size: float = 1.0 / 255.0
     steps: int = 20
+    image_size: int | None = None
     augmentation_batches: int = 1
+    augmentation_forward_batch_size: int = 1
+    metrics_interval: int = 1
     temperature: float = 0.1
     top_k: int = 4
     relative_proxy_weight: float = 0.0
@@ -43,6 +46,7 @@ class AttackHyperParams:
     jpeg_prob: float = 0.5
     jpeg_quality_min: float = 0.5
     jpeg_quality_max: float = 1.0
+    jpeg_backend: str = "tensor"
     enable_patch_drop: bool = True
     enable_drop_path: bool = True
     enable_perturbation_ema: bool = True
@@ -119,6 +123,7 @@ class GPTVictimConfig:
     reasoning_effort: str | None = None
     api_key_env: str = "OPENAI_API_KEY"
     base_url: str = "https://api.openai.com/v1"
+    request_user_agent: str | None = None
     request_timeout_seconds: int = 90
     max_retries: int = 4
     retry_backoff_seconds: float = 10.0

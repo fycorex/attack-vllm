@@ -4,6 +4,7 @@ from base64 import b64encode
 from io import BytesIO
 import json
 import os
+from pathlib import Path
 import re
 import time
 from urllib import error as urlerror
@@ -16,14 +17,44 @@ from .config import GPTVictimConfig
 from .data import AttackItem
 
 
+_DOTENV_LOADED = False
+
+
+def _load_project_dotenv() -> None:
+    global _DOTENV_LOADED
+    if _DOTENV_LOADED:
+        return
+    _DOTENV_LOADED = True
+
+    for directory in (Path.cwd(), *Path.cwd().parents):
+        env_path = directory / ".env"
+        if not env_path.is_file():
+            continue
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export ") :].strip()
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+                value = value[1:-1]
+            if key:
+                os.environ.setdefault(key, value)
+        return
+
+
 class GPTVictim:
     def __init__(self, config: GPTVictimConfig):
         self.config = config
-        self._clients: dict[tuple[str, str], object] = {}
+        self._clients: dict[tuple[str, str, str | None], object] = {}
         self._last_github_request_at: float | None = None
 
     @staticmethod
     def _load_api_key(api_key_env: str) -> str:
+        _load_project_dotenv()
         api_key = os.getenv(api_key_env)
         if not api_key:
             raise RuntimeError(
@@ -32,7 +63,7 @@ class GPTVictim:
         return api_key
 
     def _load_client(self, base_url: str, api_key_env: str):
-        cache_key = (self._normalize_base_url(base_url), api_key_env)
+        cache_key = (self._normalize_base_url(base_url), api_key_env, self.config.request_user_agent)
         client = self._clients.get(cache_key)
         if client is not None:
             return client
@@ -44,7 +75,10 @@ class GPTVictim:
             ) from exc
 
         api_key = self._load_api_key(api_key_env)
-        client = OpenAI(api_key=api_key, base_url=cache_key[0])
+        default_headers = None
+        if self.config.request_user_agent:
+            default_headers = {"User-Agent": self.config.request_user_agent}
+        client = OpenAI(api_key=api_key, base_url=cache_key[0], default_headers=default_headers)
         self._clients[cache_key] = client
         return client
 

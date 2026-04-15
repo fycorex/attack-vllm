@@ -1,96 +1,269 @@
 # Adversarial Attack on VLLMs - Practice Reproduction
 
-A practice reproduction of **arXiv:2505.01050v1** for educational purposes, scaled for consumer GPUs (RTX 4060 8GB / A6000 48GB).
+Practice reproduction of the transferable caption attack in
+arXiv:2505.01050v1. The repo contains a runnable Caltech101 engineering
+pipeline plus a stricter NIPS 2017/ImageNet manifest path for paper-grade
+experiments.
 
 Paper: https://arxiv.org/html/2505.01050v1
 
+## Current Status
+
+Current completed local output:
+
+```text
+outputs/paper_caltech
+```
+
+Current completed run size:
+
+```text
+4 Caltech101 demo items
+300 attack steps
+8 OpenCLIP surrogates
+```
+
+Current replay result on the completed 4 items:
+
+| Victim | Success | ASR |
+| --- | ---: | ---: |
+| GPT-4o | 4 / 4 | 100% |
+| GPT-5-mini | 4 / 4 | 100% |
+
+Per-item pairs:
+
+```text
+item_00: car -> dog
+item_01: dog -> watch
+item_02: watch -> laptop
+item_03: laptop -> phone
+```
+
+This is a smoke/demo result. It confirms the attack and GPT replay path work
+end to end, but it is not a paper-equivalent benchmark result.
+
+Detailed snapshot:
+
+```text
+docs/current-reproduction.md
+```
+
+Paper reproduction checklist:
+
+```text
+docs/paper-reproduction.md
+```
+
 ## Quick Start
 
+Set up the local environment:
+
 ```bash
-# 1. Set up environment
 bash scripts/run_experiment.sh setup
+```
 
-# 2. Download CLIP surrogate models (HuggingFace allowed on server)
+Download OpenCLIP surrogate checkpoints:
+
+```bash
 bash scripts/run_experiment.sh download
-
-# 3. Prepare dataset
-bash scripts/run_experiment.sh dataset
-
-# 4. Run attack (50 items, 300 steps)
-bash scripts/run_experiment.sh attack configs/caption_attack_paper.yaml 50 300
-
-# 5. Evaluate with SJTU API
-bash scripts/run_experiment.sh evaluate outputs/paper_caltech
 ```
 
-## Experiment Settings (Paper-Aligned)
+Run the 50 item by 300 step Caltech101 attack and GPT replay matrix:
 
-| Parameter | Paper Value |
-|-----------|-------------|
-| Epsilon | 16/255 ≈ 0.0627 |
-| Steps | 300 |
-| Temperature | 0.1 |
-| Top-K | 10 |
-| Positive/Negative Examples (N) | 50 |
-| Surrogate Models | 8 CLIP (SigLIP + ViT-H + ConvNeXt) |
-| PatchDrop Rate | 20% |
-| DropPath Max Rate | 15% |
-| Perturbation EMA Decay | 0.99 |
-
-## Dataset
-
-- **caltech_large**: 50 items, 50 positive + 50 negative examples each
-- Uses Caltech101 as base (~137MB)
-
-## Evaluation
-
-### SJTU API (Qwen3-VL)
 ```bash
-python scripts/evaluate_sjtu.py \
-    --output_dir outputs/paper_caltech \
-    --manifest data/caltech_large/manifest.json \
-    --model qwen3vl \
-    --api_key YOUR_API_KEY
+bash scripts/run_experiment.sh full-matrix \
+  configs/caption_attack_paper.yaml \
+  50 \
+  300 \
+  outputs/paper_caltech
 ```
 
-API: `https://models.sjtu.edu.cn/api/v1`
+Replay GPT-4o and GPT-5-mini on existing attack outputs only:
 
-### Local Ollama (Qwen3-VL-4B)
 ```bash
-python scripts/evaluate_ollama.py \
-    --output_dir outputs/paper_caltech \
-    --model qwen3-vl:4b
+bash scripts/run_experiment.sh eval-gpt outputs/paper_caltech
+```
+
+Run only GPT-5-mini on existing outputs:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/replay_gpt_eval.py \
+  --config configs/techutopia_gpt5mini_caption_eval.yaml \
+  --glob 'outputs/paper_caltech/item_*/metrics.json' \
+  > outputs/paper_caltech/eval_gpt5mini.jsonl
+```
+
+## Architecture
+
+The pipeline is split into five parts:
+
+1. Dataset manifest
+
+   Each item records a source image, source/target labels, label keywords, and
+   positive/negative example image paths. The current runnable path uses
+   Caltech101. The strict paper path builds a NIPS 2017 captioning manifest
+   with ImageNet validation examples.
+
+2. Surrogate ensemble
+
+   The attack uses 8 OpenCLIP CLIP-family surrogates, kept resident on the A6000
+   by default with `sequential_surrogates: false`.
+
+3. Attack optimization
+
+   `CaptionAttackRunner` optimizes an L-infinity bounded perturbation with
+   projected sign-gradient updates against a visual contrastive loss.
+
+4. Robust augmentations
+
+   The attack applies patch drop, drop path, perturbation EMA, Gaussian noise,
+   crop, pad, and JPEG-like transforms. Engineering runs batch stochastic
+   augmentation forwards and use a tensor JPEG approximation for speed.
+
+5. Victim replay evaluation
+
+   `scripts/replay_gpt_eval.py` evaluates existing `clean.png` and
+   `adversarial.png` pairs. It generates captions for both images and asks the
+   configured model to judge target transfer.
+
+## Current Engineering Settings
+
+Config:
+
+```text
+configs/caption_attack_paper.yaml
+```
+
+Attack:
+
+```text
+image_size: 299
+epsilon: 0.0627
+step_size: 0.004
+steps: 300
+augmentation_batches: 4
+augmentation_forward_batch_size: 4
+metrics_interval: 10
+temperature: 0.1
+top_k: 10
+jpeg_prob: 0.2
+jpeg_backend: tensor
+```
+
+Surrogates:
+
+```text
+ViT-H-14:laion2b_s32b_b79k
+ViT-H-14:metaclip_fullcc
+ViT-H-14:metaclip_altogether
+ViT-H-14-378:dfn5b
+ViT-B-16-SigLIP:webli
+ViT-B-16-SigLIP-384:webli
+ViT-L-16-SigLIP-384:webli
+convnext_xxlarge:laion2b_s34b_b82k_augreg
+```
+
+GPT replay configs:
+
+```text
+configs/techutopia_gpt4o_caption_eval.yaml
+configs/techutopia_gpt5mini_caption_eval.yaml
+```
+
+The TechUtopia endpoint uses:
+
+```text
+base_url: https://copilot.techutopia.cn
+api_key_env: TECHUTOPIA_API_KEY
+```
+
+The local key belongs in `.env`; do not commit secrets. `.env.example` contains
+only placeholders.
+
+## Strict Paper Reproduction
+
+The strict config is:
+
+```text
+configs/caption_attack_paper_strict_repro.yaml
+```
+
+It targets:
+
+```text
+1000 NIPS 2017 dev images
+50 ImageNet validation positive examples per target class
+50 ImageNet validation negative examples per source class
+300 attack steps
+GPT-4o caption judge evaluation
+```
+
+Prepare the manifest with:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/prepare_nips2017_caption_manifest.py \
+  --nips_csv /path/to/nips2017/dev_dataset.csv \
+  --nips_images_dir /path/to/nips2017/images \
+  --imagenet_val_dir /path/to/imagenet/val \
+  --class_index_json /path/to/imagenet_class_index.json \
+  --output_dir data/nips2017_caption_attack \
+  --num_examples 50 \
+  --limit 1000 \
+  --copy_files
+```
+
+Then run:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/run_caption_attack.py \
+  --config configs/caption_attack_paper_strict_repro.yaml \
+  --verbose
 ```
 
 ## Project Structure
 
-```
+```text
 attack-vllm/
-├── src/attack_vlm_repro/
-│   ├── attack.py          # Main attack runner
-│   ├── config.py          # Configuration
-│   ├── losses.py          # Visual contrastive loss
-│   ├── surrogates.py      # CLIP surrogate models
-│   ├── augmentations.py   # Data augmentation
-│   ├── ollama_victim.py   # Local Ollama victim
-│   └── eval.py            # Evaluation utilities
-├── scripts/
-│   ├── run_caption_attack.py    # Main attack script
-│   ├── evaluate_ollama.py        # Local evaluation
-│   ├── evaluate_sjtu.py          # SJTU API evaluation
-│   ├── prepare_caltech_demo.py   # Dataset preparation
-│   └── run_experiment.sh         # Full pipeline
 ├── configs/
-│   └── caption_attack_paper.yaml
-└── data/
-    └── caltech_large/
+│   ├── caption_attack_paper.yaml
+│   ├── caption_attack_paper_strict_repro.yaml
+│   ├── techutopia_gpt4o_caption_eval.yaml
+│   └── techutopia_gpt5mini_caption_eval.yaml
+├── docs/
+│   ├── current-reproduction.md
+│   └── paper-reproduction.md
+├── scripts/
+│   ├── prepare_caltech_demo.py
+│   ├── prepare_nips2017_caption_manifest.py
+│   ├── replay_gpt_eval.py
+│   ├── run_caption_attack.py
+│   └── run_experiment.sh
+└── src/attack_vlm_repro/
+    ├── attack.py
+    ├── augmentations.py
+    ├── config.py
+    ├── gpt_victim.py
+    ├── losses.py
+    └── surrogates.py
 ```
 
 ## Requirements
 
-- Python 3.10+
-- PyTorch 2.0+
-- open_clip
-- transformers
-- pillow
-- requests
+The pinned environment uses CUDA 12.8 PyTorch wheels. Install with:
+
+```bash
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+Core packages:
+
+```text
+torch + torchvision cu128
+open_clip_torch
+transformers
+Pillow
+httpx
+openai
+PyYAML
+tqdm
+```

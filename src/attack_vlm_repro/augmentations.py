@@ -65,6 +65,42 @@ class AttackAugmentationPipeline:
         return torch.stack(outputs, dim=0)
 
     def apply_diff_jpeg(self, images: torch.Tensor) -> torch.Tensor:
+        backend = self.config.jpeg_backend.strip().lower()
+        if backend == "tensor":
+            return self.apply_tensor_jpeg(images)
+        if backend == "pil":
+            return self.apply_pil_jpeg(images)
+        raise ValueError(f"Unsupported jpeg_backend: {self.config.jpeg_backend}")
+
+    def apply_tensor_jpeg(self, images: torch.Tensor) -> torch.Tensor:
+        quality = random.uniform(self.config.jpeg_quality_min, self.config.jpeg_quality_max)
+        levels = max(8, int(16 + (quality * 239)))
+        compressed = torch.round(images * levels) / levels
+
+        if quality < 0.95:
+            _, _, height, width = images.shape
+            scale = max(0.5, min(1.0, 0.5 + (0.5 * quality)))
+            down_h = max(1, int(round(height * scale)))
+            down_w = max(1, int(round(width * scale)))
+            compressed = F.interpolate(
+                compressed,
+                size=(down_h, down_w),
+                mode="bilinear",
+                align_corners=False,
+                antialias=True,
+            )
+            compressed = F.interpolate(
+                compressed,
+                size=(height, width),
+                mode="bilinear",
+                align_corners=False,
+                antialias=True,
+            )
+
+        compressed = compressed.clamp(0.0, 1.0)
+        return images + (compressed - images).detach()
+
+    def apply_pil_jpeg(self, images: torch.Tensor) -> torch.Tensor:
         quality = random.uniform(self.config.jpeg_quality_min, self.config.jpeg_quality_max)
         jpeg_images = []
         for image in images:

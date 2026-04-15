@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from io import BytesIO
 
-import requests
+import httpx
 from PIL import Image
 
 
@@ -68,7 +68,7 @@ class SJTUVictim:
             "temperature": 0.0
         }
 
-        response = requests.post(url, headers=headers, json=payload, timeout=120)
+        response = httpx.post(url, headers=headers, json=payload, timeout=120)
         response.raise_for_status()
         result = response.json()
         return result["choices"][0]["message"]["content"]

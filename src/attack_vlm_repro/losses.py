@@ -9,6 +9,7 @@ def visual_contrastive_loss(
     negative_embeddings: torch.Tensor,
     temperature: float,
     top_k: int,
+    collect_metrics: bool = True,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     positive_logits = image_embeddings @ positive_embeddings.t()
     negative_logits = image_embeddings @ negative_embeddings.t()
@@ -23,6 +24,8 @@ def visual_contrastive_loss(
     topk_positive = torch.topk(pos_log_probs, k=k, dim=1).values
 
     loss = -topk_positive.mean() + neg_log_probs.mean()
+    if not collect_metrics:
+        return loss, {}
     metrics = {
         "positive_logprob_mean": float(pos_log_probs.mean().detach().cpu()),
         "negative_logprob_mean": float(neg_log_probs.mean().detach().cpu()),
@@ -37,6 +40,7 @@ def relative_proxy_loss(
     positive_embeddings: torch.Tensor,
     negative_embeddings: torch.Tensor,
     top_k: int,
+    collect_metrics: bool = True,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     clean_positive_logits = clean_image_embeddings @ positive_embeddings.t()
     clean_negative_logits = clean_image_embeddings @ negative_embeddings.t()
@@ -50,6 +54,8 @@ def relative_proxy_loss(
     positive_gain = adversarial_positive_topk.mean() - clean_positive_topk.mean()
     negative_shift = adversarial_negative_logits.mean() - clean_negative_logits.mean()
     loss = -positive_gain + negative_shift
+    if not collect_metrics:
+        return loss, {}
     metrics = {
         "relative_positive_gain": float(positive_gain.detach().cpu()),
         "relative_negative_shift": float(negative_shift.detach().cpu()),

@@ -86,10 +86,15 @@ def main():
 
     print(f"Found {len(available)} usable classes")
 
+    if len(available) < 2:
+        raise RuntimeError("Need at least two usable Caltech101 classes to build source-target pairs.")
+
     items = []
-    for item_idx in range(min(args.num_items, len(available) - 1)):
-        source_idx, source_raw = available[item_idx]
-        target_idx, target_raw = available[(item_idx + 1) % len(available)]
+    for item_idx in range(args.num_items):
+        source_position = item_idx % len(available)
+        source_idx, source_raw = available[source_position]
+        target_idx, target_raw = available[(source_position + 1) % len(available)]
+        class_cycle = item_idx // len(available)
 
         source_name = SIMPLE_NAMES.get(source_raw, source_raw)
         target_name = SIMPLE_NAMES.get(target_raw, target_raw)
@@ -98,7 +103,7 @@ def main():
 
         # Get source image
         src_indices = class_to_indices[source_idx]
-        img, _ = ds[src_indices[0]]
+        img, _ = ds[src_indices[class_cycle % len(src_indices)]]
 
         image_path = images_dir / f"item_{item_idx:02d}.png"
         image_path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,7 +116,7 @@ def main():
         positive_paths = []
         tgt_indices = class_to_indices[target_idx]
         for ex_idx in range(args.num_examples):
-            ex_img, _ = ds[tgt_indices[ex_idx % len(tgt_indices)]]
+            ex_img, _ = ds[tgt_indices[(class_cycle + ex_idx) % len(tgt_indices)]]
             if ex_img.mode != "RGB":
                 ex_img = ex_img.convert("RGB")
             ex_path = examples_dir / target_name / f"positive_{item_idx:02d}_{ex_idx:02d}.png"
@@ -123,7 +128,7 @@ def main():
         # Negative examples (source class)
         negative_paths = []
         for ex_idx in range(args.num_examples):
-            ex_img, _ = ds[src_indices[(ex_idx + 1) % len(src_indices)]]
+            ex_img, _ = ds[src_indices[(class_cycle + ex_idx + 1) % len(src_indices)]]
             if ex_img.mode != "RGB":
                 ex_img = ex_img.convert("RGB")
             ex_path = examples_dir / source_name / f"negative_{item_idx:02d}_{ex_idx:02d}.png"

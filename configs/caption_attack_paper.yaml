@@ -18,10 +18,13 @@ runtime:
 
 attack:
   # Paper: epsilon=16/255 ≈ 0.0627
+  image_size: 299
   epsilon: 0.0627
   step_size: 0.004
   steps: 300
   augmentation_batches: 4
+  augmentation_forward_batch_size: 4
+  metrics_interval: 10
   temperature: 0.1
   top_k: 10
   patch_drop_rate: 0.20
@@ -39,6 +42,7 @@ attack:
   pad_prob: 0.5
   enable_jpeg: true
   jpeg_prob: 0.2
+  jpeg_backend: "tensor"
 
 # 8 CLIP models - paper Table 3 with SigLIP + ViT-H + ConvNeXt
 # Paper Section 3.2: 4x ViT-H + 3x ViT-SigLIP + 1x ConvNeXt XXL

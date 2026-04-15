@@ -1,0 +1,29 @@
+# TechUtopia Copilot OpenAI-compatible caption victim/judge config.
+# The endpoint accepts any bearer token, but Cloudflare blocks default Python
+# clients unless a browser-like User-Agent is sent.
+experiment_name: "techutopia-gpt4o-caption-eval"
+
+evaluation:
+  gpt_victim:
+    enabled: true
+    model_name: "gpt-4o"
+    task_type: "caption"
+    api_mode: "chat_completions"
+    prompt_mode: "freeform"
+    success_mode: "judge"
+    caption_prompt: "Provide a concise description of the image using no more than three sentences."
+    require_source_absent: false
+    max_output_tokens: 64
+    temperature: 0.0
+    api_key_env: "TECHUTOPIA_API_KEY"
+    base_url: "https://copilot.techutopia.cn"
+    request_user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    request_timeout_seconds: 120
+    max_retries: 4
+    retry_backoff_seconds: 10.0
+    judge_model_name: "gpt-4o"
+    judge_api_mode: "chat_completions"
+    judge_max_output_tokens: 128
+    judge_temperature: 0.0
+    judge_api_key_env: "TECHUTOPIA_API_KEY"
+    judge_base_url: "https://copilot.techutopia.cn"

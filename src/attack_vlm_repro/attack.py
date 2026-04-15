@@ -31,15 +31,21 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def _accumulate_step_metrics(target: dict[str, float], metrics: dict[str, float]) -> None:
+def _accumulate_step_metrics(target: dict[str, float], metrics: dict[str, float], weight: float = 1.0) -> None:
     for key, value in metrics.items():
-        target[key] = target.get(key, 0.0) + float(value)
+        target[key] = target.get(key, 0.0) + (float(value) * weight)
 
 
 def _average_step_metrics(total: dict[str, float], count: int) -> dict[str, float]:
     if count <= 1:
         return total
     return {key: value / float(count) for key, value in total.items()}
+
+
+def _should_collect_step_metrics(step: int, total_steps: int, metrics_interval: int) -> bool:
+    if metrics_interval <= 0:
+        return False
+    return step % metrics_interval == 0 or step == total_steps - 1
 
 
 class CaptionAttackRunner:
@@ -113,6 +119,28 @@ class CaptionAttackRunner:
             return images
         return F.interpolate(images, size=(input_size, input_size), mode="bilinear", align_corners=False, antialias=True)
 
+    def _base_attack_size(self) -> int:
+        if self.config.attack.image_size is not None:
+            return int(self.config.attack.image_size)
+        for spec in self.config.surrogates:
+            if spec.enabled:
+                return int(spec.input_size)
+        raise RuntimeError("No enabled surrogates are configured.")
+
+    def _augment_for_surrogate(
+        self,
+        pipeline: AttackAugmentationPipeline,
+        surrogate_input: torch.Tensor,
+        batch_size: int,
+    ) -> torch.Tensor:
+        if batch_size <= 1:
+            return pipeline(surrogate_input, self.config.attack.epsilon)
+        augmented = [
+            pipeline(surrogate_input, self.config.attack.epsilon)
+            for _ in range(batch_size)
+        ]
+        return torch.cat(augmented, dim=0)
+
     def _precompute_example_embeddings(self, item: AttackItem) -> dict:
         example_cache = {}
         for surrogate in self.surrogates:
@@ -122,10 +150,14 @@ class CaptionAttackRunner:
             pos_batch = torch.stack([load_image_tensor(path, size) for path in item.positive_image_paths], dim=0).to(self.device)
             neg_batch = torch.stack([load_image_tensor(path, size) for path in item.negative_image_paths], dim=0).to(self.device)
             with torch.no_grad():
-                pos_emb = surrogate.encode_image(pos_batch).cpu()
-                neg_emb = surrogate.encode_image(neg_batch).cpu()
+                pos_emb = surrogate.encode_image(pos_batch)
+                neg_emb = surrogate.encode_image(neg_batch)
                 clean_input = load_image_tensor(item.image_path, size).unsqueeze(0).to(self.device)
-                clean_emb = surrogate.encode_image(clean_input).cpu()
+                clean_emb = surrogate.encode_image(clean_input)
+            if self.config.runtime.sequential_surrogates:
+                pos_emb = pos_emb.cpu()
+                neg_emb = neg_emb.cpu()
+                clean_emb = clean_emb.cpu()
             example_cache[surrogate.name] = {
                 "positive_embeddings": pos_emb,
                 "negative_embeddings": neg_emb,
@@ -219,7 +251,7 @@ class CaptionAttackRunner:
 
     def attack_item(self, item: AttackItem) -> dict:
         example_cache = self._precompute_example_embeddings(item)
-        base_size = next(spec.input_size for spec in self.config.surrogates if spec.enabled)
+        base_size = self._base_attack_size()
         clean = load_image_tensor(item.image_path, base_size).unsqueeze(0).to(self.device)
         delta = torch.zeros_like(clean, requires_grad=True)
         delta_ema = torch.zeros_like(clean)
@@ -231,8 +263,11 @@ class CaptionAttackRunner:
         patch_drop_rate = self.config.attack.patch_drop_rate if self.config.attack.enable_patch_drop else 0.0
         drop_path_max_rate = self.config.attack.drop_path_max_rate if self.config.attack.enable_drop_path else 0.0
         augmentation_batches = max(1, int(self.config.attack.augmentation_batches))
+        augmentation_forward_batch_size = max(1, int(self.config.attack.augmentation_forward_batch_size))
+        metrics_interval = int(self.config.attack.metrics_interval)
 
         for step in tqdm(range(self.config.attack.steps), desc=f"attack:{item.item_id}", leave=False):
+            collect_step_metrics = _should_collect_step_metrics(step, self.config.attack.steps, metrics_interval)
             if delta.grad is not None:
                 delta.grad.zero_()
 
@@ -246,12 +281,18 @@ class CaptionAttackRunner:
                 negative_embeddings = example_cache[surrogate.name]["negative_embeddings"].to(self.device)
                 clean_reference_embeddings = example_cache[surrogate.name]["clean_embedding"].to(self.device)
                 surrogate_metrics_total: dict[str, float] = {}
+                surrogate_metrics_weight = 0
 
-                for _ in range(augmentation_batches):
+                for aug_start in range(0, augmentation_batches, augmentation_forward_batch_size):
+                    current_batch_size = min(augmentation_forward_batch_size, augmentation_batches - aug_start)
                     bounded_delta = delta.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)
                     adv = (clean + bounded_delta).clamp(0.0, 1.0)
                     surrogate_input = self._resize_for_surrogate(adv, surrogate.config.input_size)
-                    surrogate_input = pipelines[surrogate.config.input_size](surrogate_input, self.config.attack.epsilon)
+                    surrogate_input = self._augment_for_surrogate(
+                        pipelines[surrogate.config.input_size],
+                        surrogate_input,
+                        current_batch_size,
+                    )
                     embeddings = surrogate.encode_image(
                         surrogate_input,
                         patch_drop_rate=patch_drop_rate,
@@ -263,6 +304,7 @@ class CaptionAttackRunner:
                         negative_embeddings,
                         temperature=self.config.attack.temperature,
                         top_k=self.config.attack.top_k,
+                        collect_metrics=collect_step_metrics,
                     )
                     if self.config.attack.relative_proxy_weight > 0.0:
                         relative_loss, relative_metrics = relative_proxy_loss(
@@ -271,14 +313,22 @@ class CaptionAttackRunner:
                             positive_embeddings,
                             negative_embeddings,
                             top_k=self.config.attack.top_k,
+                            collect_metrics=collect_step_metrics,
                         )
                         loss = loss + (self.config.attack.relative_proxy_weight * relative_loss)
                         metrics.update(relative_metrics)
-                    (loss / float(augmentation_batches)).backward()
-                    total_loss_value += float(loss.detach().cpu()) / float(augmentation_batches)
-                    _accumulate_step_metrics(surrogate_metrics_total, metrics)
+                    loss_weight = float(current_batch_size) / float(augmentation_batches)
+                    (loss * loss_weight).backward()
+                    if collect_step_metrics:
+                        total_loss_value += float(loss.detach().cpu()) * loss_weight
+                        _accumulate_step_metrics(surrogate_metrics_total, metrics, weight=float(current_batch_size))
+                        surrogate_metrics_weight += current_batch_size
 
-                step_metrics[surrogate.name] = _average_step_metrics(surrogate_metrics_total, augmentation_batches)
+                if collect_step_metrics:
+                    step_metrics[surrogate.name] = _average_step_metrics(
+                        surrogate_metrics_total,
+                        surrogate_metrics_weight,
+                    )
                 if self.config.runtime.sequential_surrogates:
                     unload_surrogate(surrogate)
 
@@ -296,13 +346,14 @@ class CaptionAttackRunner:
                 else:
                     delta_ema.copy_(delta.detach())
 
-            history.append(
-                {
-                    "step": step,
-                    "loss": total_loss_value,
-                    "surrogates": step_metrics,
-                }
-            )
+            if collect_step_metrics:
+                history.append(
+                    {
+                        "step": step,
+                        "loss": total_loss_value,
+                        "surrogates": step_metrics,
+                    }
+                )
 
         final_delta = delta_ema.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)
         final_adv = (clean + final_delta).clamp(0.0, 1.0)

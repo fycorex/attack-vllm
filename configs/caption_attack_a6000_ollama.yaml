@@ -19,6 +19,8 @@ attack:
   step_size: 1.0
   steps: 200
   augmentation_batches: 4
+  augmentation_forward_batch_size: 4
+  metrics_interval: 10
   temperature: 0.1
   top_k: 4
   patch_drop_rate: 0.20
@@ -27,6 +29,7 @@ attack:
   enable_patch_drop: true
   enable_drop_path: true
   enable_perturbation_ema: true
+  jpeg_backend: "tensor"
 
 surrogates:
   - model_name: "ViT-B-32"

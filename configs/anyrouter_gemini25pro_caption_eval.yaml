@@ -1,0 +1,29 @@
+# AnyRouter caption victim/judge config for replaying existing adversarial images.
+# Use with scripts/replay_gpt_eval.py or copy this evaluation block into an
+# attack config. The secret is loaded from ANYROUTER_API_KEY, optionally via
+# the ignored local .env file.
+experiment_name: "anyrouter-gemini25pro-caption-eval"
+
+evaluation:
+  gpt_victim:
+    enabled: true
+    model_name: "gemini-2.5-pro"
+    task_type: "caption"
+    api_mode: "auto"
+    prompt_mode: "freeform"
+    success_mode: "judge"
+    caption_prompt: "Provide a concise description of the image using no more than three sentences."
+    require_source_absent: false
+    max_output_tokens: 64
+    temperature: 0.0
+    api_key_env: "ANYROUTER_API_KEY"
+    base_url: "https://anyrouter.top"
+    request_timeout_seconds: 120
+    max_retries: 4
+    retry_backoff_seconds: 10.0
+    judge_model_name: "gemini-2.5-pro"
+    judge_api_mode: "auto"
+    judge_max_output_tokens: 128
+    judge_temperature: 0.0
+    judge_api_key_env: "ANYROUTER_API_KEY"
+    judge_base_url: "https://anyrouter.top"
