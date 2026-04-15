@@ -17,6 +17,7 @@ cd "$PROJECT_ROOT"
 
 export PYTHONPATH="$PROJECT_ROOT/src:${PYTHONPATH:-}"
 VENV="$PROJECT_ROOT/.venv"
+VENV_PYTHON="$VENV/bin/python"
 
 # Colors
 RED='\033[0;31m'
@@ -28,19 +29,64 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+find_python() {
+    if [ -n "${PYTHON_BIN:-}" ]; then
+        if command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+            echo "$PYTHON_BIN"
+            return 0
+        fi
+
+        log_error "PYTHON_BIN is set to '$PYTHON_BIN', but that command was not found" >&2
+        return 1
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        echo "python3"
+        return 0
+    fi
+
+    if command -v python >/dev/null 2>&1; then
+        echo "python"
+        return 0
+    fi
+
+    log_error "No Python interpreter found. Install Python 3 or set PYTHON_BIN=/path/to/python" >&2
+    return 1
+}
+
+create_venv() {
+    local python_cmd="$1"
+    local clear_flag="${2:-}"
+    local venv_args=()
+
+    if [ -n "$clear_flag" ]; then
+        venv_args+=("$clear_flag")
+    fi
+
+    if ! "$python_cmd" -m venv "${venv_args[@]}" "$VENV"; then
+        log_error "Failed to create virtual environment at $VENV"
+        log_error "Install the Python venv module for your interpreter, then rerun this script"
+        exit 1
+    fi
+}
+
 # =============================================================================
 # Step 1: Environment Setup
 # =============================================================================
 setup_environment() {
     log_info "Setting up environment..."
 
-    # Create venv if not exists
+    local python_cmd
+    python_cmd="$(find_python)"
+
+    # Create venv if it does not exist. If a partial/broken venv directory is
+    # present, rebuild it in place instead of failing on a missing activate file.
     if [ ! -d "$VENV" ]; then
         log_info "Creating virtual environment..."
-        if ! python3 -m venv "$VENV"; then
-            log_error "Failed to create virtual environment at $VENV"
-            exit 1
-        fi
+        create_venv "$python_cmd"
+    elif [ ! -f "$VENV/bin/activate" ] || [ ! -x "$VENV_PYTHON" ]; then
+        log_warn "Virtual environment at $VENV is incomplete; rebuilding it..."
+        create_venv "$python_cmd" "--clear"
     fi
 
     # Check activation
@@ -52,15 +98,15 @@ setup_environment() {
     fi
 
     # Upgrade pip
-    pip install --upgrade pip -q
+    "$VENV_PYTHON" -m pip install --upgrade pip -q
 
     # Install requirements
     if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt -q
+        "$VENV_PYTHON" -m pip install -r requirements.txt -q
     fi
 
     # Install scipy for Caltech101 dataset
-    pip install scipy -q
+    "$VENV_PYTHON" -m pip install scipy -q
 
     log_info "Environment ready"
 }

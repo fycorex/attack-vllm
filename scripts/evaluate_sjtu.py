@@ -14,7 +14,7 @@ from PIL import Image
 class SJTUVictim:
     """Victim using SJTU ModelScope API (Qwen3VL)."""
 
-    def __init__(self, api_key: str, base_url: str = "https://models.sjtu.edu.cn/api/v1"):
+    def __init__(self, api_key: str, base_url: str = "https://models.sjtu.edu.cn"):
         self.api_key = api_key
         self.base_url = base_url
         self.model = "Qwen/Qwen2.5-VL-7B-Instruct"
