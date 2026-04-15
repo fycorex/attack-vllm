@@ -15,11 +15,11 @@ runtime:
   cudnn_benchmark: true
 
 attack:
-  epsilon: 32.0  # Higher perturbation budget
-  step_size: 2.0
+  epsilon: 16.0  # Paper default
+  step_size: 1.0
   steps: 200
   augmentation_batches: 4
-  temperature: 0.05  # Lower temperature for sharper loss
+  temperature: 0.1
   top_k: 4
   patch_drop_rate: 0.30
   drop_path_max_rate: 0.15

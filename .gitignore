@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.so
 .pytest_cache/
 .mypy_cache/
@@ -8,19 +9,34 @@ __pycache__/
 # Virtual environments
 .venv/
 venv/
+ENV/
 
-# Model and run artifacts
+# Models (download separately)
 models/
+data/model_scope_cache/
+
+# Datasets (download separately)
+data/caltech_demo/
+data/caltech_large/
+data/imagenet_style_50/
+data/cifar10_*/
+data/ocr_word_attack_demo/
+data/*_demo/
+data/imagenet/
+data/imagenet_cache/
+data/imagenet_ms/
+
+# Experiment outputs
 outputs/
 
-# Generated local datasets
-data/**/images/
-data/**/examples/
-data/**/torchvision/
-data/**/*.png
-data/**/*.jpg
-data/**/*.jpeg
+# Secrets
+.env
+*.key
+credentials.json
 
 # OS / editor
 .DS_Store
 .omx/
+.vscode/
+.idea/
+*.swp
