@@ -151,7 +151,7 @@ models = [
     # ViT-SigLIP variants (3 from paper)
     ("ViT-B-16-SigLIP", "webli"),
     ("ViT-B-16-SigLIP-384", "webli"),
-    ("ViT-L-16-SigLIP", "webli"),
+    ("ViT-L-16-SigLIP-384", "webli"),
     # ConvNeXt XXL (1 from paper)
     ("convnext_xxlarge", "laion2b_s34b_b82k_augreg"),
 ]
@@ -161,9 +161,12 @@ os.makedirs(cache_dir, exist_ok=True)
 
 success = 0
 failed = 0
+available_models = set(open_clip.list_models())
 for model_name, pretrained in models:
     try:
         print(f"Loading {model_name}:{pretrained}...")
+        if model_name not in available_models:
+            raise RuntimeError(f"Model config for '{model_name}' is not available in this open_clip install")
         model = open_clip.create_model(model_name, pretrained=pretrained, cache_dir=cache_dir)
         print(f"  ✓ {model_name}:{pretrained}")
         success += 1
@@ -174,6 +177,8 @@ for model_name, pretrained in models:
 print(f"\nDownloaded: {success}/{len(models)} models")
 if failed > 0:
     print(f"Failed: {failed} models")
+    print("Rerun download after fixing network/cache issues, or set HF_TOKEN for Hugging Face rate limits.")
+    raise SystemExit(1)
 EOF
 
     log_info "Model download complete"

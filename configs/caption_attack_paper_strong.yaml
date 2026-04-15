@@ -1,0 +1,65 @@
+# Strong config using only cached models
+experiment_name: "paper-caltech-strong"
+
+paths:
+  manifest: "data/caltech_large/manifest.json"
+  output_dir: "outputs/paper_caltech_strong"
+  model_cache_dir: "models"
+
+runtime:
+  device: "cuda"
+  seed: 42
+  attack_limit: 16
+  sequential_surrogates: true
+  enable_tf32: true
+  cudnn_benchmark: true
+
+attack:
+  epsilon: 0.0627
+  step_size: 0.004
+  steps: 300
+  augmentation_batches: 4
+  temperature: 0.1
+  top_k: 10
+  patch_drop_rate: 0.20
+  drop_path_max_rate: 0.15
+  perturbation_ema_decay: 0.99
+  enable_patch_drop: true
+  enable_drop_path: true
+  enable_perturbation_ema: true
+  enable_gaussian: true
+  gaussian_prob: 0.5
+  gaussian_scale_multiplier: 0.25
+  enable_crop: true
+  crop_prob: 0.5
+  enable_pad: true
+  pad_prob: 0.5
+  enable_jpeg: true
+  jpeg_prob: 0.2
+
+# 5 cached models: ViT-B, ViT-L, ResNet
+surrogates:
+  - model_name: "ViT-B-32"
+    pretrained: "laion2b_s34b_b79k"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-B-16"
+    pretrained: "laion2b_s34b_b88k"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-L-14"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+  - model_name: "RN50"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+  - model_name: "RN101"
+    pretrained: "openai"
+    input_size: 224
+    enabled: true
+
+evaluation:
+  ollama_victim:
+    enabled: false
