@@ -1,8 +1,8 @@
-# Transferable Adversarial Attacks on Black-Box Vision-Language Models
+# Adversarial Attack on VLLMs - Practice Reproduction
 
-A method-faithful reproduction of **arXiv:2505.01050v1** for attacking Vision-Language Models (VLLMs), scaled for consumer GPUs (RTX 4060 8GB / A6000 48GB).
+A practice reproduction of **arXiv:2505.01050v1** for educational purposes, scaled for consumer GPUs (RTX 4060 8GB / A6000 48GB).
 
-**Paper**: https://arxiv.org/html/2505.01050v1
+Paper: https://arxiv.org/html/2505.01050v1
 
 ## Quick Start
 
@@ -19,43 +19,37 @@ bash scripts/run_experiment.sh dataset
 # 4. Run attack (50 items, 300 steps)
 bash scripts/run_experiment.sh attack configs/caption_attack_paper.yaml 50 300
 
-# 5. Evaluate with SJTU Qwen3VL API
+# 5. Evaluate with SJTU API
 bash scripts/run_experiment.sh evaluate outputs/paper_caltech
-```
-
-Or run the full pipeline:
-```bash
-bash scripts/run_experiment.sh full
 ```
 
 ## Experiment Settings (Paper-Aligned)
 
-| Parameter | Paper Value | Our Value |
-|-----------|-------------|-----------|
-| Epsilon | 16/255 ≈ 0.0627 | 0.0627 |
-| Steps | 300 | 300 |
-| Temperature | 0.1 | 0.1 |
-| Top-K | 10 | 10 |
-| Positive/Negative Examples (N) | 50 | 50 |
-| Surrogate Models | 8 CLIP | 5-8 CLIP |
-| PatchDrop Rate | 20% | 20% |
-| DropPath Max Rate | 15% | 15% |
-| Perturbation EMA Decay | 0.99 | 0.99 |
+| Parameter | Paper Value |
+|-----------|-------------|
+| Epsilon | 16/255 ≈ 0.0627 |
+| Steps | 300 |
+| Temperature | 0.1 |
+| Top-K | 10 |
+| Positive/Negative Examples (N) | 50 |
+| Surrogate Models | 8 CLIP (SigLIP + ViT-H + ConvNeXt) |
+| PatchDrop Rate | 20% |
+| DropPath Max Rate | 15% |
+| Perturbation EMA Decay | 0.99 |
 
 ## Dataset
 
-- **ImageNet-style 50**: 50 items, 50 positive + 50 negative examples each (5050 images)
-- Uses Caltech101 as base (ImageNet-like classes, ~137MB vs 150GB ImageNet)
-- Or use ImageNet-1K validation set (~6GB)
+- **caltech_large**: 50 items, 50 positive + 50 negative examples each
+- Uses Caltech101 as base (~137MB)
 
 ## Evaluation
 
-### SJTU ModelScope API (Qwen2.5-VL-7B-Instruct)
+### SJTU API (Qwen3-VL)
 ```bash
 python scripts/evaluate_sjtu.py \
     --output_dir outputs/paper_caltech \
     --manifest data/caltech_large/manifest.json \
-    --api_key sk-c-EUyeSmz8EfJiqF6ssQVg
+    --api_key YOUR_API_KEY
 ```
 
 API: `https://models.sjtu.edu.cn/api/v1`
@@ -73,10 +67,10 @@ python scripts/evaluate_ollama.py \
 attack-vllm/
 ├── src/attack_vlm_repro/
 │   ├── attack.py          # Main attack runner
-│   ├── config.py          # Configuration dataclasses
+│   ├── config.py          # Configuration
 │   ├── losses.py          # Visual contrastive loss
 │   ├── surrogates.py      # CLIP surrogate models
-│   ├── augmentations.py   # Data augmentation pipeline
+│   ├── augmentations.py   # Data augmentation
 │   ├── ollama_victim.py   # Local Ollama victim
 │   └── eval.py            # Evaluation utilities
 ├── scripts/
@@ -84,20 +78,12 @@ attack-vllm/
 │   ├── evaluate_ollama.py        # Local evaluation
 │   ├── evaluate_sjtu.py          # SJTU API evaluation
 │   ├── prepare_caltech_demo.py   # Dataset preparation
-│   └── run_experiment.sh         # Full experiment pipeline
+│   └── run_experiment.sh         # Full pipeline
 ├── configs/
-│   └── caption_attack_paper.yaml  # Paper-aligned config
+│   └── caption_attack_paper.yaml
 └── data/
-    └── imagenet_style_50/        # 50-item dataset
+    └── caltech_large/
 ```
-
-## Key Results
-
-| Setting | Proxy ASR | Transfer ASR (Qwen3-VL-4B) |
-|---------|-----------|---------------------------|
-| 4 surrogates, N=8 | 50% | 0% |
-| 5 surrogates, N=50 | 93.75% | 31.2% |
-| 8 surrogates, N=50 | TBD | TBD |
 
 ## Requirements
 
@@ -107,9 +93,3 @@ attack-vllm/
 - transformers
 - pillow
 - requests
-
-## Notes
-
-- Server (A6000/better network): Can use HuggingFace for model downloads
-- Local: Use ModelScope mirror (`modelscope.cn`) for faster downloads
-- SJTU API key required for cloud evaluation
