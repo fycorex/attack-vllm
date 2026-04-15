@@ -74,7 +74,8 @@ Download OpenCLIP surrogate checkpoints:
 bash scripts/run_experiment.sh download
 ```
 
-Run the 50 item by 300 step Caltech101 attack and GPT replay matrix:
+Run the full 50 item by 300 step Caltech101 attack and GPT replay matrix with
+the default 16/255 epsilon budget:
 
 ```bash
 bash scripts/run_experiment.sh full-matrix \
@@ -89,6 +90,16 @@ manifest has fewer than 50 items, it regenerates the Caltech101 demo manifest
 with 50 items before launching the attack. That is the path to use when a
 previous smoke run only produced 4 items. This dataset regeneration path has
 been verified locally to write items `item_00` through `item_49`.
+
+Run the same full experiment with the optional 8/255 epsilon budget:
+
+```bash
+bash scripts/run_experiment.sh full-matrix \
+  configs/caption_attack_paper_eps8.yaml \
+  50 \
+  300 \
+  outputs/paper_caltech_eps8
+```
 
 Replay GPT-4o and GPT-5-mini on existing attack outputs only:
 
@@ -162,7 +173,7 @@ jpeg_prob: 0.2
 jpeg_backend: tensor
 ```
 
-Optional 8/255 epsilon experiment:
+Optional 8/255 epsilon experiment command:
 
 ```bash
 bash scripts/run_experiment.sh full-matrix \
