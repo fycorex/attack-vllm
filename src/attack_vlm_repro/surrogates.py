@@ -119,6 +119,11 @@ def _pretrained_uses_quick_gelu(model_name: str, pretrained: str | None) -> bool
     return bool(pretrained_cfg and pretrained_cfg.get("quick_gelu", False))
 
 
+def _surrogate_precision(config: SurrogateConfig, device: str) -> str:
+    device_type = torch.device(device).type
+    return "fp16" if config.use_fp16 and device_type == "cuda" else "fp32"
+
+
 def create_surrogate(config: SurrogateConfig, device: str, cache_dir: str | Path | None = None) -> SurrogateWrapper:
     resolved_cache_dir = Path(cache_dir) if cache_dir is not None else None
     if resolved_cache_dir is not None:
@@ -126,6 +131,7 @@ def create_surrogate(config: SurrogateConfig, device: str, cache_dir: str | Path
     model, _, preprocess = open_clip.create_model_and_transforms(
         model_name=config.model_name,
         pretrained=config.pretrained,
+        precision=_surrogate_precision(config, device),
         device=device,
         cache_dir=str(resolved_cache_dir) if resolved_cache_dir is not None else None,
         force_quick_gelu=_pretrained_uses_quick_gelu(config.model_name, config.pretrained),

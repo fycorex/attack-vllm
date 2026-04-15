@@ -255,7 +255,7 @@ def apply_profile(config: AttackConfig, profile: str | None) -> None:
         config.attack.top_k = max(config.attack.top_k, 4)
         config.runtime.enable_tf32 = True
         config.runtime.cudnn_benchmark = True
-        config.runtime.sequential_surrogates = True
+        config.runtime.sequential_surrogates = False
         applied_overrides = {
             "surrogate_policy": "clip_first_a6000_heavy",
             "runtime.attack_limit_min": 8,
@@ -264,7 +264,7 @@ def apply_profile(config: AttackConfig, profile: str | None) -> None:
             "attack.top_k_min": 4,
             "runtime.enable_tf32": True,
             "runtime.cudnn_benchmark": True,
-            "runtime.sequential_surrogates": True,
+            "runtime.sequential_surrogates": False,
         }
     elif normalized == "api":
         config.evaluation.gpt_victim.enabled = True

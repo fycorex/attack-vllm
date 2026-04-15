@@ -41,6 +41,22 @@ def main() -> None:
         default=None,
         help="Optional override for attack optimization steps, useful for faster local debugging.",
     )
+    parser.add_argument(
+        "--augmentation_batches",
+        type=int,
+        default=None,
+        help="Optional override for stochastic augmentation batches per attack step.",
+    )
+    parser.add_argument(
+        "--parallel_surrogates",
+        action="store_true",
+        help="Keep all enabled surrogates resident on GPU instead of moving each model every step.",
+    )
+    parser.add_argument(
+        "--disable_jpeg",
+        action="store_true",
+        help="Disable JPEG augmentation to avoid CPU/PIL round trips during faster runs.",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -55,6 +71,15 @@ def main() -> None:
     if args.steps is not None:
         config.attack.steps = args.steps
         cli_overrides["attack.steps"] = args.steps
+    if args.augmentation_batches is not None:
+        config.attack.augmentation_batches = args.augmentation_batches
+        cli_overrides["attack.augmentation_batches"] = args.augmentation_batches
+    if args.parallel_surrogates:
+        config.runtime.sequential_surrogates = False
+        cli_overrides["runtime.sequential_surrogates"] = False
+    if args.disable_jpeg:
+        config.attack.enable_jpeg = False
+        cli_overrides["attack.enable_jpeg"] = False
     config.profile_metadata["cli_overrides"] = cli_overrides
     config.profile_metadata["enabled_surrogates_after_cli_overrides"] = enabled_surrogate_names(config)
 

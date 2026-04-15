@@ -12,7 +12,7 @@ runtime:
   device: "cuda"
   seed: 42
   attack_limit: 50
-  sequential_surrogates: true  # Set to false on A6000 with more VRAM
+  sequential_surrogates: false  # Keep all surrogates on the A6000 to avoid per-step model transfers.
   enable_tf32: true
   cudnn_benchmark: true
 
