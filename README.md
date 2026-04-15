@@ -49,6 +49,7 @@ bash scripts/run_experiment.sh evaluate outputs/paper_caltech
 python scripts/evaluate_sjtu.py \
     --output_dir outputs/paper_caltech \
     --manifest data/caltech_large/manifest.json \
+    --model qwen3vl \
     --api_key YOUR_API_KEY
 ```
 

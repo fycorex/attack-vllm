@@ -204,11 +204,15 @@ evaluate_sjtu() {
 
     OUTPUT_DIR=${1:-outputs/paper_caltech}
     API_KEY=${2:-sk-c-EUyeSmz8EfJiqF6ssQVg}
+    SJTU_BASE_URL=${SJTU_BASE_URL:-https://models.sjtu.edu.cn/api/v1}
+    SJTU_MODEL=${SJTU_MODEL:-qwen3vl}
 
     python scripts/evaluate_sjtu.py \
         --output_dir "$OUTPUT_DIR" \
         --manifest "data/${DATASET:-caltech_large}/manifest.json" \
-        --api_key "$API_KEY"
+        --api_key "$API_KEY" \
+        --base-url "$SJTU_BASE_URL" \
+        --model "$SJTU_MODEL"
 
     if [ -f "$OUTPUT_DIR/sjtu_eval.json" ]; then
         log_info "Results saved to $OUTPUT_DIR/sjtu_eval.json"

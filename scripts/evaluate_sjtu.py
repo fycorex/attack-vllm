@@ -11,13 +11,31 @@ import requests
 from PIL import Image
 
 
+DEFAULT_SJTU_BASE_URL = "https://models.sjtu.edu.cn/api/v1"
+DEFAULT_SJTU_MODEL = "qwen3vl"
+
+
 class SJTUVictim:
     """Victim using SJTU ModelScope API (Qwen3VL)."""
 
-    def __init__(self, api_key: str, base_url: str = "https://models.sjtu.edu.cn"):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = DEFAULT_SJTU_BASE_URL,
+        model: str = DEFAULT_SJTU_MODEL,
+    ):
         self.api_key = api_key
-        self.base_url = base_url
-        self.model = "Qwen/Qwen2.5-VL-7B-Instruct"
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+
+    def _chat_completions_url(self) -> str:
+        if self.base_url.endswith("/chat/completions"):
+            return self.base_url
+        if self.base_url.endswith("/v1"):
+            return f"{self.base_url}/chat/completions"
+        if self.base_url.endswith("/api"):
+            return f"{self.base_url}/v1/chat/completions"
+        return f"{self.base_url}/api/v1/chat/completions"
 
     def _encode_image(self, image: Image.Image) -> str:
         """Encode PIL image to base64."""
@@ -29,7 +47,7 @@ class SJTUVictim:
         """Generate response from Qwen3VL via SJTU API."""
         image_b64 = self._encode_image(image)
 
-        url = f"{self.base_url}/v1/chat/completions"
+        url = self._chat_completions_url()
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -86,17 +104,19 @@ def main():
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--manifest", default="data/imagenet_style_50/manifest.json")
     parser.add_argument("--api_key", default="sk-c-EUyeSmz8EfJiqF6ssQVg")
+    parser.add_argument("--base_url", "--base-url", default=DEFAULT_SJTU_BASE_URL)
+    parser.add_argument("--model", default=DEFAULT_SJTU_MODEL)
     args = parser.parse_args()
 
     import sys
     sys.path.insert(0, "src")
     from attack_vlm_repro.data import load_manifest
 
-    victim = SJTUVictim(args.api_key)
+    victim = SJTUVictim(args.api_key, base_url=args.base_url, model=args.model)
     output_dir = Path(args.output_dir)
     manifest = load_manifest(args.manifest)
 
-    print(f"SJTU API test with Qwen2.5-VL-7B-Instruct")
+    print(f"SJTU API test with {victim.model}")
 
     results = []
     for item in manifest.items:  # Evaluate all items
