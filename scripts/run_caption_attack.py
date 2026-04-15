@@ -5,8 +5,8 @@ import argparse
 import json
 import sys
 
-from attack_vlm_repro.attack import run_attack
-from attack_vlm_repro.config import SUPPORTED_PROFILES, apply_profile, enabled_surrogate_names, load_config
+from attack import run_attack
+from config import SUPPORTED_PROFILES, apply_profile, enabled_surrogate_names, load_config
 
 
 def main() -> None:

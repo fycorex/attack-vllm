@@ -311,36 +311,6 @@ evaluate_gpt_matrix() {
 }
 
 # =============================================================================
-# Optional: Evaluate with SJTU API
-# =============================================================================
-evaluate_sjtu() {
-    log_info "Evaluating with SJTU Qwen3VL API..."
-
-    source "$VENV/bin/activate"
-
-    OUTPUT_DIR=${1:-outputs/paper_caltech}
-    API_KEY=${2:-sk-c-EUyeSmz8EfJiqF6ssQVg}
-    # SJTU API base URL (without /api/v1 suffix to avoid double path)
-    SJTU_BASE_URL=${SJTU_BASE_URL:-https://models.sjtu.edu.cn/api/v1}
-    SJTU_MODEL=${SJTU_MODEL:-qwen3vl}
-
-    log_info "SJTU API: $SJTU_BASE_URL"
-    log_info "Model: $SJTU_MODEL"
-    log_info "Output: $OUTPUT_DIR"
-
-    python scripts/evaluate_sjtu.py \
-        --output_dir "$OUTPUT_DIR" \
-        --manifest "data/${DATASET:-caltech_large}/manifest.json" \
-        --api_key "$API_KEY" \
-        --base-url "$SJTU_BASE_URL" \
-        --model "$SJTU_MODEL"
-
-    if [ -f "$OUTPUT_DIR/sjtu_eval.json" ]; then
-        log_info "Results saved to $OUTPUT_DIR/sjtu_eval.json"
-    fi
-}
-
-# =============================================================================
 # Step 6: Full Pipeline
 # =============================================================================
 run_full_experiment() {
@@ -381,9 +351,6 @@ case "${1:-}" in
     attack)
         run_attack "${2:-}" "${3:-}" "${4:-}"
         ;;
-    evaluate)
-        evaluate_sjtu "${2:-}" "${3:-}"
-        ;;
     eval-gpt|evaluate-gpt|matrix)
         evaluate_gpt_matrix "${2:-}" "${3:-}"
         ;;
@@ -396,14 +363,13 @@ case "${1:-}" in
         run_full_experiment "$@"
         ;;
     *)
-        echo "Usage: $0 {setup|download|dataset|attack|evaluate|eval-gpt|full-matrix|full}"
+        echo "Usage: $0 {setup|download|dataset|attack|eval-gpt|full-matrix|full}"
         echo ""
         echo "Commands:"
         echo "  setup           - Set up Python environment"
         echo "  download        - Download 8 CLIP models (paper Table 3)"
         echo "  dataset         - Prepare 50-item dataset"
         echo "  attack [cfg] [n] [s] - Run attack (config, items, steps)"
-        echo "  evaluate [out] [key] - Evaluate with SJTU API"
         echo "  eval-gpt [out] [glob] - Replay GPT-4o and GPT-5-mini eval matrix"
         echo "  full-matrix [cfg] [n] [s] [out] - Run 50x300 attack plus GPT eval matrix"
         echo "  full            - Run setup, downloads, attack, and GPT eval matrix"
@@ -412,7 +378,6 @@ case "${1:-}" in
         echo "  $0 full-matrix                             # 50 items x 300 steps + GPT eval matrix"
         echo "  $0 attack configs/caption_attack_paper.yaml 50 300"
         echo "  $0 eval-gpt outputs/paper_caltech"
-        echo "  $0 evaluate outputs/paper_caltech"
         exit 1
         ;;
 esac

@@ -7,9 +7,9 @@ from pathlib import Path
 
 from PIL import Image
 
-from attack_vlm_repro.config import load_config
-from attack_vlm_repro.data import AttackItem
-from attack_vlm_repro.gpt_victim import GPTVictim
+from config import load_config
+from data import AttackItem
+from gpt_victim import GPTVictim
 
 
 def build_item(metrics: dict) -> AttackItem:
@@ -61,7 +61,7 @@ def main() -> None:
     parser.add_argument(
         "--glob",
         default=None,
-        help="Optional glob for metrics paths, for example 'outputs/caption_attack_phase2_mixed4_localblip/item_*/metrics.json'.",
+        help="Optional glob for metrics paths, for example 'outputs/paper_caltech/item_*/metrics.json'.",
     )
     parser.add_argument("--limit", type=int, default=None, help="Optional limit after expanding inputs.")
     args = parser.parse_args()

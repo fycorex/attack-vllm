@@ -14,7 +14,7 @@ The current completed run uses the local Caltech101 demo manifest:
 data/caltech_large/manifest.json
 ```
 
-The manifest currently contains 4 completed attack items. The wrapper now
+The uploaded result snapshot contains 4 completed attack items. The wrapper now
 regenerates the Caltech101 demo manifest when fewer than the requested item
 count exists, so the 50 item by 300 step run is:
 
@@ -25,6 +25,10 @@ bash scripts/run_experiment.sh full-matrix \
   300 \
   outputs/paper_caltech
 ```
+
+Use this command for the full 50-item run when a previous smoke run only
+produced 4 items. The dataset step has been verified to regenerate
+`data/caltech_large/manifest.json` to 50 items before running the attack.
 
 For paper-grade reproduction, use the NIPS 2017/ImageNet manifest flow and
 `configs/caption_attack_paper_strict_repro.yaml`; see
@@ -91,7 +95,7 @@ Attack hyperparameters:
 
 ```text
 image_size: 299
-epsilon: 0.0627
+epsilon: 16/255 = 0.0627
 step_size: 0.004
 steps: 300
 augmentation_batches: 4
@@ -107,6 +111,16 @@ crop_prob: 0.5
 pad_prob: 0.5
 jpeg_prob: 0.2
 jpeg_backend: tensor
+```
+
+Lower-budget 8/255 epsilon option:
+
+```bash
+bash scripts/run_experiment.sh full-matrix \
+  configs/caption_attack_paper_eps8.yaml \
+  50 \
+  300 \
+  outputs/paper_caltech_eps8
 ```
 
 Surrogate ensemble:
@@ -168,6 +182,12 @@ Current completed attack output:
 outputs/paper_caltech
 ```
 
+Tracked uploaded result snapshot:
+
+```text
+docs/results/paper_caltech_demo
+```
+
 Attack summary:
 
 ```text
@@ -193,7 +213,7 @@ GPT-5-mini: 4 / 4 = 100%
 ```
 
 Generated replay files are under `outputs/paper_caltech/` and remain ignored by
-Git:
+Git. The compact tracked copy is under `docs/results/paper_caltech_demo/`.
 
 ```text
 eval_gpt4o.jsonl

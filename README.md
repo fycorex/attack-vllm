@@ -48,6 +48,12 @@ Detailed snapshot:
 docs/current-reproduction.md
 ```
 
+Uploaded result images and replay files:
+
+```text
+docs/results/paper_caltech_demo/
+```
+
 Paper reproduction checklist:
 
 ```text
@@ -77,6 +83,12 @@ bash scripts/run_experiment.sh full-matrix \
   300 \
   outputs/paper_caltech
 ```
+
+This command first checks `data/caltech_large/manifest.json`. If the existing
+manifest has fewer than 50 items, it regenerates the Caltech101 demo manifest
+with 50 items before launching the attack. That is the path to use when a
+previous smoke run only produced 4 items. This dataset regeneration path has
+been verified locally to write items `item_00` through `item_49`.
 
 Replay GPT-4o and GPT-5-mini on existing attack outputs only:
 
@@ -148,6 +160,16 @@ temperature: 0.1
 top_k: 10
 jpeg_prob: 0.2
 jpeg_backend: tensor
+```
+
+Optional 8/255 epsilon experiment:
+
+```bash
+bash scripts/run_experiment.sh full-matrix \
+  configs/caption_attack_paper_eps8.yaml \
+  50 \
+  300 \
+  outputs/paper_caltech_eps8
 ```
 
 Surrogates:
@@ -226,19 +248,21 @@ PYTHONPATH=src .venv/bin/python scripts/run_caption_attack.py \
 attack-vllm/
 ├── configs/
 │   ├── caption_attack_paper.yaml
+│   ├── caption_attack_paper_eps8.yaml
 │   ├── caption_attack_paper_strict_repro.yaml
 │   ├── techutopia_gpt4o_caption_eval.yaml
 │   └── techutopia_gpt5mini_caption_eval.yaml
 ├── docs/
 │   ├── current-reproduction.md
-│   └── paper-reproduction.md
+│   ├── paper-reproduction.md
+│   └── results/paper_caltech_demo/
 ├── scripts/
 │   ├── prepare_caltech_demo.py
 │   ├── prepare_nips2017_caption_manifest.py
 │   ├── replay_gpt_eval.py
 │   ├── run_caption_attack.py
 │   └── run_experiment.sh
-└── src/attack_vlm_repro/
+└── src/
     ├── attack.py
     ├── augmentations.py
     ├── config.py

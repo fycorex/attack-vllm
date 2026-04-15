@@ -79,4 +79,4 @@ This config uses:
 - Confirm the ImageNet validation label base. The script defaults to 1-based labels.
 - Audit the exact appendix surrogate checkpoint names against available
   OpenCLIP/Hugging Face checkpoints before claiming paper-equivalent ASR.
-- Run AnyRouter or direct API replay separately for non-GPT-4o victim models.
+- Run direct API replay separately for non-GPT-4o victim models.

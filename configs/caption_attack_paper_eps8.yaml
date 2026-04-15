@@ -1,11 +1,11 @@
 # Paper-aligned config: arXiv:2505.01050v1
 # 8 CLIP models as per paper Table 3 (achieves 94.4% on GPT-4o)
 # Default: ViT-SigLIP (3) + ViT-H (4) + ConvNeXt (1) per paper Section 3.2
-experiment_name: "paper-full"
+experiment_name: "paper-full-eps8"
 
 paths:
   manifest: "data/caltech_large/manifest.json"
-  output_dir: "outputs/paper_caltech"
+  output_dir: "outputs/paper_caltech_eps8"
   model_cache_dir: "models"
 
 runtime:
@@ -17,9 +17,9 @@ runtime:
   cudnn_benchmark: true
 
 attack:
-  # Paper-aligned default: epsilon=16/255 ≈ 0.0627.
+  # Lower-budget engineering option: epsilon=8/255 ≈ 0.03137.
   image_size: 299
-  epsilon: 0.0627
+  epsilon: 0.0313725
   step_size: 0.004
   steps: 300
   augmentation_batches: 4
