@@ -223,7 +223,10 @@ class CaptionAttackRunner:
         clean = load_image_tensor(item.image_path, base_size).unsqueeze(0).to(self.device)
         delta = torch.zeros_like(clean, requires_grad=True)
         delta_ema = torch.zeros_like(clean)
-        pipeline = AttackAugmentationPipeline(self.config.attack, base_size)
+        pipelines = {
+            surrogate.config.input_size: AttackAugmentationPipeline(self.config.attack, surrogate.config.input_size)
+            for surrogate in self.surrogates
+        }
         history = []
         patch_drop_rate = self.config.attack.patch_drop_rate if self.config.attack.enable_patch_drop else 0.0
         drop_path_max_rate = self.config.attack.drop_path_max_rate if self.config.attack.enable_drop_path else 0.0
@@ -248,7 +251,7 @@ class CaptionAttackRunner:
                     bounded_delta = delta.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)
                     adv = (clean + bounded_delta).clamp(0.0, 1.0)
                     surrogate_input = self._resize_for_surrogate(adv, surrogate.config.input_size)
-                    surrogate_input = pipeline(surrogate_input, self.config.attack.epsilon)
+                    surrogate_input = pipelines[surrogate.config.input_size](surrogate_input, self.config.attack.epsilon)
                     embeddings = surrogate.encode_image(
                         surrogate_input,
                         patch_drop_rate=patch_drop_rate,

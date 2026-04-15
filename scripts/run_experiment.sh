@@ -159,6 +159,10 @@ models = [
 cache_dir = "models/open_clip"
 os.makedirs(cache_dir, exist_ok=True)
 
+def pretrained_uses_quick_gelu(model_name, pretrained):
+    pretrained_cfg = open_clip.get_pretrained_cfg(model_name, pretrained)
+    return bool(pretrained_cfg and pretrained_cfg.get("quick_gelu", False))
+
 success = 0
 failed = 0
 available_models = set(open_clip.list_models())
@@ -167,7 +171,12 @@ for model_name, pretrained in models:
         print(f"Loading {model_name}:{pretrained}...")
         if model_name not in available_models:
             raise RuntimeError(f"Model config for '{model_name}' is not available in this open_clip install")
-        model = open_clip.create_model(model_name, pretrained=pretrained, cache_dir=cache_dir)
+        model = open_clip.create_model(
+            model_name,
+            pretrained=pretrained,
+            cache_dir=cache_dir,
+            force_quick_gelu=pretrained_uses_quick_gelu(model_name, pretrained),
+        )
         print(f"  ✓ {model_name}:{pretrained}")
         success += 1
     except Exception as e:

@@ -112,6 +112,13 @@ def _get_residual_blocks(model: torch.nn.Module) -> list[torch.nn.Module]:
     return []
 
 
+def _pretrained_uses_quick_gelu(model_name: str, pretrained: str | None) -> bool:
+    if not pretrained:
+        return False
+    pretrained_cfg = open_clip.get_pretrained_cfg(model_name, pretrained)
+    return bool(pretrained_cfg and pretrained_cfg.get("quick_gelu", False))
+
+
 def create_surrogate(config: SurrogateConfig, device: str, cache_dir: str | Path | None = None) -> SurrogateWrapper:
     resolved_cache_dir = Path(cache_dir) if cache_dir is not None else None
     if resolved_cache_dir is not None:
@@ -121,6 +128,7 @@ def create_surrogate(config: SurrogateConfig, device: str, cache_dir: str | Path
         pretrained=config.pretrained,
         device=device,
         cache_dir=str(resolved_cache_dir) if resolved_cache_dir is not None else None,
+        force_quick_gelu=_pretrained_uses_quick_gelu(config.model_name, config.pretrained),
     )
     model.eval()
     model.requires_grad_(False)
