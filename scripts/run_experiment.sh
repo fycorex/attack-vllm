@@ -2,6 +2,10 @@
 # =============================================================================
 # Transferable Adversarial Attack on VLLMs - Complete Experiment Script
 # Based on arXiv:2505.01050v1
+#
+# Usage on different machines:
+# - RTX 4060 (8GB): Use 5 models, sequential loading
+# - A6000 (48GB): Use 8 models, parallel loading
 # =============================================================================
 
 set -e
@@ -26,14 +30,29 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 setup_environment() {
     log_info "Setting up environment..."
 
+    # Create venv if not exists
     if [ ! -d "$VENV" ]; then
-        python -m venv "$VENV"
+        log_info "Creating virtual environment..."
+        python3 -m venv "$VENV"
     fi
 
-    source "$VENV/bin/activate"
-    pip install -r requirements.txt
+    # Check activation
+    if [ -f "$VENV/bin/activate" ]; then
+        source "$VENV/bin/activate"
+    else
+        log_error "Virtual environment not found at $VENV"
+        exit 1
+    fi
 
-    # Install scipy for Caltech101
+    # Upgrade pip
+    pip install --upgrade pip -q
+
+    # Install requirements
+    if [ -f "requirements.txt" ]; then
+        pip install -r requirements.txt -q
+    fi
+
+    # Install scipy for Caltech101 dataset
     pip install scipy -q
 
     log_info "Environment ready"
@@ -47,12 +66,13 @@ download_models() {
 
     source "$VENV/bin/activate"
 
-    # Download from HuggingFace (allowed on server with better network)
+    # Paper Table 3: 8 CLIP models for best transfer (94.4% on GPT-4o)
+    # On server with good network: use HuggingFace directly
     python3 << 'EOF'
 import open_clip
 import os
 
-# Models to download (8 CLIP models as per paper Table 3)
+# 8 CLIP models as per paper (Table 3)
 models = [
     ("ViT-B-32", "laion2b_s34b_b79k"),
     ("ViT-B-16", "laion2b_s34b_b88k"),
@@ -87,12 +107,12 @@ prepare_dataset() {
 
     source "$VENV/bin/activate"
 
-    # Option 1: Use existing Caltech101 data (smaller)
+    # Option 1: Use existing dataset
     if [ -d "data/caltech_large" ]; then
         log_info "Using existing Caltech101 dataset"
         export DATASET="caltech_large"
     else
-        # Option 2: Prepare ImageNet-style 50-item dataset
+        # Option 2: Prepare 50-item dataset (paper uses 50 images)
         log_info "Preparing Caltech101 dataset (50 items, N=50)..."
         python scripts/prepare_caltech_demo.py --output_dir data/caltech_large --num_items 50 --num_examples 50
         export DATASET="caltech_large"
@@ -137,31 +157,21 @@ evaluate_sjtu() {
         --manifest "data/${DATASET:-caltech_large}/manifest.json" \
         --api_key "$API_KEY"
 
-    # Print summary
     if [ -f "$OUTPUT_DIR/sjtu_eval.json" ]; then
         log_info "Results saved to $OUTPUT_DIR/sjtu_eval.json"
     fi
 }
 
 # =============================================================================
-# Step 6: Full Experiment Pipeline
+# Step 6: Full Pipeline
 # =============================================================================
 run_full_experiment() {
     log_info "Starting full experiment pipeline..."
 
-    # Step 1: Setup
     setup_environment
-
-    # Step 2: Download models
     download_models
-
-    # Step 3: Prepare dataset
     prepare_dataset
-
-    # Step 4: Run attack
     run_attack "$@"
-
-    # Step 5: Evaluate with SJTU
     evaluate_sjtu
 
     log_info "Full experiment complete!"
@@ -195,11 +205,11 @@ case "${1:-}" in
         echo ""
         echo "Commands:"
         echo "  setup           - Set up Python environment"
-        echo "  download        - Download CLIP surrogate models"
-        echo "  dataset         - Prepare dataset"
-        echo "  attack [config] [items] [steps] - Run attack"
-        echo "  evaluate [output_dir] [api_key] - Evaluate with SJTU API"
-        echo "  full            - Run complete experiment pipeline"
+        echo "  download        - Download 8 CLIP models (paper Table 3)"
+        echo "  dataset         - Prepare 50-item dataset"
+        echo "  attack [cfg] [n] [s] - Run attack (config, items, steps)"
+        echo "  evaluate [out] [key] - Evaluate with SJTU API"
+        echo "  full            - Run complete pipeline"
         echo ""
         echo "Examples:"
         echo "  $0 full                                    # Full pipeline"
