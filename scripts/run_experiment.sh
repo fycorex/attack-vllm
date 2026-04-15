@@ -75,9 +75,13 @@ create_venv() {
 # =============================================================================
 setup_environment() {
     log_info "Setting up environment..."
+    log_info "Project root: $PROJECT_ROOT"
+    log_info "Venv path: $VENV"
 
     local python_cmd
     python_cmd="$(find_python)"
+    log_info "Using Python: $(command -v "$python_cmd")"
+    log_info "Python version: $($python_cmd --version 2>&1)"
 
     # Create venv if it does not exist. If a partial/broken venv directory is
     # present, rebuild it in place instead of failing on a missing activate file.
@@ -87,10 +91,13 @@ setup_environment() {
     elif [ ! -f "$VENV/bin/activate" ] || [ ! -x "$VENV_PYTHON" ]; then
         log_warn "Virtual environment at $VENV is incomplete; rebuilding it..."
         create_venv "$python_cmd" "--clear"
+    else
+        log_info "Virtual environment exists and is valid"
     fi
 
     # Check activation
     if [ -f "$VENV/bin/activate" ]; then
+        log_info "Activating virtual environment..."
         source "$VENV/bin/activate"
     else
         log_error "Virtual environment not found at $VENV"
@@ -98,15 +105,24 @@ setup_environment() {
     fi
 
     # Upgrade pip
-    "$VENV_PYTHON" -m pip install --upgrade pip -q
+    log_info "Upgrading pip..."
+    "$VENV_PYTHON" -m pip install --upgrade pip
 
     # Install requirements
     if [ -f "requirements.txt" ]; then
-        "$VENV_PYTHON" -m pip install -r requirements.txt -q
+        log_info "Installing requirements from requirements.txt..."
+        "$VENV_PYTHON" -m pip install -r requirements.txt
     fi
 
     # Install scipy for Caltech101 dataset
-    "$VENV_PYTHON" -m pip install scipy -q
+    log_info "Installing scipy..."
+    "$VENV_PYTHON" -m pip install scipy
+
+    # Verify installation
+    log_info "Verifying key packages..."
+    "$VENV_PYTHON" -c "import torch; print(f'  PyTorch: {torch.__version__}')"
+    "$VENV_PYTHON" -c "import open_clip; print(f'  open_clip: OK')"
+    "$VENV_PYTHON" -c "import transformers; print(f'  transformers: {transformers.__version__}')"
 
     log_info "Environment ready"
 }
@@ -115,38 +131,49 @@ setup_environment() {
 # Step 2: Download CLIP Surrogate Models
 # =============================================================================
 download_models() {
-    log_info "Downloading CLIP surrogate models..."
+    log_info "Downloading CLIP surrogate models (paper Section 3.2: 4x ViT-H + 3x SigLIP + 1x ConvNeXt)..."
 
     source "$VENV/bin/activate"
 
-    # Paper Table 3: 8 CLIP models for best transfer (94.4% on GPT-4o)
-    # On server with good network: use HuggingFace directly
+    # Paper Section 3.2: 4x ViT-H + 3x ViT-SigLIP + 1x ConvNeXt XXL
+    # These achieve 94.4% ASR on GPT-4o (paper Table 3)
     python3 << 'EOF'
 import open_clip
 import os
 
-# 8 CLIP models as per paper (Table 3)
+# 8 CLIP models as per paper Section 3.2
 models = [
-    ("ViT-B-32", "laion2b_s34b_b79k"),
-    ("ViT-B-16", "laion2b_s34b_b88k"),
-    ("ViT-L-14", "openai"),
-    ("ViT-L-14-336", "openai"),
+    # ViT-H variants (4 from paper)
     ("ViT-H-14", "laion2b_s32b_b79k"),
-    ("ViT-bigG-14", "laion2b_s39b_b160k"),
-    ("RN50", "openai"),
-    ("RN101", "openai"),
+    ("ViT-H-14", "metaclip_fullcc"),
+    ("ViT-H-14", "metaclip_altogether"),
+    ("ViT-H-14-378", "dfn5b"),
+    # ViT-SigLIP variants (3 from paper)
+    ("ViT-B-16-SigLIP", "webli"),
+    ("ViT-B-16-SigLIP-384", "webli"),
+    ("ViT-L-16-SigLIP", "webli"),
+    # ConvNeXt XXL (1 from paper)
+    ("convnext_xxlarge", "laion2b_s34b_b82k_augreg"),
 ]
 
 cache_dir = "models/open_clip"
 os.makedirs(cache_dir, exist_ok=True)
 
+success = 0
+failed = 0
 for model_name, pretrained in models:
     try:
         print(f"Loading {model_name}:{pretrained}...")
         model = open_clip.create_model(model_name, pretrained=pretrained, cache_dir=cache_dir)
         print(f"  ✓ {model_name}:{pretrained}")
+        success += 1
     except Exception as e:
-        print(f"  ✗ {model_name}:{pretrained} - {str(e)[:60]}")
+        print(f"  ✗ {model_name}:{pretrained} - {str(e)[:80]}")
+        failed += 1
+
+print(f"\nDownloaded: {success}/{len(models)} models")
+if failed > 0:
+    print(f"Failed: {failed} models")
 EOF
 
     log_info "Model download complete"
@@ -204,8 +231,13 @@ evaluate_sjtu() {
 
     OUTPUT_DIR=${1:-outputs/paper_caltech}
     API_KEY=${2:-sk-c-EUyeSmz8EfJiqF6ssQVg}
+    # SJTU API base URL (without /api/v1 suffix to avoid double path)
     SJTU_BASE_URL=${SJTU_BASE_URL:-https://models.sjtu.edu.cn/api/v1}
     SJTU_MODEL=${SJTU_MODEL:-qwen3vl}
+
+    log_info "SJTU API: $SJTU_BASE_URL"
+    log_info "Model: $SJTU_MODEL"
+    log_info "Output: $OUTPUT_DIR"
 
     python scripts/evaluate_sjtu.py \
         --output_dir "$OUTPUT_DIR" \
