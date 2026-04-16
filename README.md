@@ -9,34 +9,34 @@ Paper: https://arxiv.org/html/2505.01050v1
 
 ## Current Status
 
-Current completed local output:
+Current completed local outputs:
 
 ```text
 outputs/paper_caltech
+outputs/paper_caltech_eps8
 ```
 
-Current completed run size:
+Current completed full run size:
 
 ```text
-4 Caltech101 demo items
+50 Caltech101 demo items
 300 attack steps
 8 OpenCLIP surrogates
 ```
 
-Current replay result on the completed 4 items:
+Current full replay result:
 
-| Victim | Success | ASR |
-| --- | ---: | ---: |
-| GPT-4o | 4 / 4 | 100% |
-| GPT-5-mini | 4 / 4 | 100% |
+| Epsilon | Proxy ASR | GPT-4o ASR | GPT-5-mini ASR |
+| --- | ---: | ---: | ---: |
+| 16/255 | 50 / 50 = 100% | 48 / 50 = 96% | 48 / 50 = 96% |
+| 8/255 | 49 / 50 = 98% | 43 / 50 = 86% | 44 / 50 = 88% |
 
-Per-item pairs:
+Full result analysis and uploaded images:
 
 ```text
-item_00: car -> dog
-item_01: dog -> watch
-item_02: watch -> laptop
-item_03: laptop -> phone
+docs/results/full-experiment-analysis.md
+docs/results/paper_caltech_eps16_full/
+docs/results/paper_caltech_eps8_full/
 ```
 
 This is a smoke/demo result. It confirms the attack and GPT replay path work
@@ -52,6 +52,8 @@ Uploaded result images and replay files:
 
 ```text
 docs/results/paper_caltech_demo/
+docs/results/paper_caltech_eps16_full/
+docs/results/paper_caltech_eps8_full/
 ```
 
 Paper reproduction checklist:

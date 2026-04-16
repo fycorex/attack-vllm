@@ -1,0 +1,1529 @@
+{
+  "item_id": "item_30",
+  "image_path": "/home/ubuntu/attack-vllm/data/caltech_large/images/item_30.png",
+  "source_label": "car",
+  "target_label": "dog",
+  "source_keywords": [
+    "car",
+    "automobile",
+    "vehicle"
+  ],
+  "target_keywords": [
+    "dog",
+    "puppy",
+    "canine"
+  ],
+  "question": "What is the main object in the image? Answer in one word.",
+  "source_answer_text": "car",
+  "target_answer_text": "dog",
+  "source_answer_keywords": [
+    "car",
+    "automobile",
+    "vehicle"
+  ],
+  "target_answer_keywords": [
+    "dog",
+    "puppy",
+    "canine"
+  ],
+  "source_text_keywords": [
+    "car",
+    "automobile",
+    "vehicle"
+  ],
+  "target_text_keywords": [
+    "dog",
+    "puppy",
+    "canine"
+  ],
+  "proxy_eval": {
+    "clean_margin": -0.30844922736287117,
+    "adversarial_margin": 0.49046577513217926,
+    "margin_gain": 0.7989150024950504,
+    "proxy_success": true,
+    "per_surrogate": {
+      "ViT-H-14:laion2b_s32b_b79k": {
+        "clean_margin": -0.4370627701282501,
+        "adversarial_margin": 0.566315233707428,
+        "margin_gain": 1.003378003835678,
+        "proxy_success": true
+      },
+      "ViT-H-14:metaclip_fullcc": {
+        "clean_margin": -0.23304688930511475,
+        "adversarial_margin": 0.38299232721328735,
+        "margin_gain": 0.6160392165184021,
+        "proxy_success": true
+      },
+      "ViT-H-14:metaclip_altogether": {
+        "clean_margin": -0.37986668944358826,
+        "adversarial_margin": 0.47092318534851074,
+        "margin_gain": 0.850789874792099,
+        "proxy_success": true
+      },
+      "ViT-H-14-378:dfn5b": {
+        "clean_margin": -0.35848468542099,
+        "adversarial_margin": 0.5374892950057983,
+        "margin_gain": 0.8959739804267883,
+        "proxy_success": true
+      },
+      "ViT-B-16-SigLIP:webli": {
+        "clean_margin": -0.2010982632637024,
+        "adversarial_margin": 0.4279521405696869,
+        "margin_gain": 0.6290504038333893,
+        "proxy_success": true
+      },
+      "ViT-B-16-SigLIP-384:webli": {
+        "clean_margin": -0.20291882753372192,
+        "adversarial_margin": 0.44352248311042786,
+        "margin_gain": 0.6464413106441498,
+        "proxy_success": true
+      },
+      "ViT-L-16-SigLIP-384:webli": {
+        "clean_margin": -0.1788960099220276,
+        "adversarial_margin": 0.45148271322250366,
+        "margin_gain": 0.6303787231445312,
+        "proxy_success": true
+      },
+      "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+        "clean_margin": -0.47621968388557434,
+        "adversarial_margin": 0.6430488228797913,
+        "margin_gain": 1.1192685067653656,
+        "proxy_success": true
+      }
+    }
+  },
+  "caption_eval": null,
+  "vqa_eval": null,
+  "ocr_eval": null,
+  "gpt_eval": null,
+  "ollama_eval": null,
+  "qwen_vl_eval": null,
+  "history": [
+    {
+      "step": 0,
+      "loss": 14.151522397994995,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -6.978450775146484,
+          "negative_logprob_mean": -4.040882587432861,
+          "topk_positive_logprob_mean": -6.35280704498291
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -6.506621360778809,
+          "negative_logprob_mean": -4.038018226623535,
+          "topk_positive_logprob_mean": -6.1222944259643555
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -7.119910717010498,
+          "negative_logprob_mean": -3.9988791942596436,
+          "topk_positive_logprob_mean": -6.557984828948975
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -7.4095001220703125,
+          "negative_logprob_mean": -4.00250244140625,
+          "topk_positive_logprob_mean": -6.995179653167725
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.558923244476318,
+          "negative_logprob_mean": -4.721141338348389,
+          "topk_positive_logprob_mean": -4.230137825012207
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -6.050905227661133,
+          "negative_logprob_mean": -4.110670566558838,
+          "topk_positive_logprob_mean": -5.5611138343811035
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -5.658137798309326,
+          "negative_logprob_mean": -4.207214832305908,
+          "topk_positive_logprob_mean": -5.071153163909912
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -7.044434547424316,
+          "negative_logprob_mean": -4.074518203735352,
+          "topk_positive_logprob_mean": -6.454679012298584
+        }
+      }
+    },
+    {
+      "step": 10,
+      "loss": 2.1812996864318848,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -5.436534404754639,
+          "negative_logprob_mean": -4.32412576675415,
+          "topk_positive_logprob_mean": -4.668979644775391
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -5.394477367401123,
+          "negative_logprob_mean": -4.213274955749512,
+          "topk_positive_logprob_mean": -4.9498209953308105
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -5.666223049163818,
+          "negative_logprob_mean": -4.17446756362915,
+          "topk_positive_logprob_mean": -5.072502136230469
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -5.13604736328125,
+          "negative_logprob_mean": -4.333102703094482,
+          "topk_positive_logprob_mean": -4.582131385803223
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.881217002868652,
+          "negative_logprob_mean": -4.549844741821289,
+          "topk_positive_logprob_mean": -4.3276190757751465
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.705043315887451,
+          "negative_logprob_mean": -4.587937355041504,
+          "topk_positive_logprob_mean": -4.33234167098999
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -5.000115394592285,
+          "negative_logprob_mean": -4.465308666229248,
+          "topk_positive_logprob_mean": -4.4189348220825195
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -5.454487323760986,
+          "negative_logprob_mean": -4.308260440826416,
+          "topk_positive_logprob_mean": -4.785292148590088
+        }
+      }
+    },
+    {
+      "step": 20,
+      "loss": -4.159165382385254,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.756125450134277,
+          "negative_logprob_mean": -4.68831205368042,
+          "topk_positive_logprob_mean": -4.1049652099609375
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -5.157331466674805,
+          "negative_logprob_mean": -4.303718566894531,
+          "topk_positive_logprob_mean": -4.717067241668701
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -5.081026554107666,
+          "negative_logprob_mean": -4.4113030433654785,
+          "topk_positive_logprob_mean": -4.4017558097839355
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.731046199798584,
+          "negative_logprob_mean": -4.6047892570495605,
+          "topk_positive_logprob_mean": -4.237409591674805
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.308621883392334,
+          "negative_logprob_mean": -5.191888332366943,
+          "topk_positive_logprob_mean": -3.875103712081909
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.510151386260986,
+          "negative_logprob_mean": -4.907268524169922,
+          "topk_positive_logprob_mean": -3.961576223373413
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.673397541046143,
+          "negative_logprob_mean": -4.696490287780762,
+          "topk_positive_logprob_mean": -4.1799774169921875
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.6469268798828125,
+          "negative_logprob_mean": -4.857194900512695,
+          "topk_positive_logprob_mean": -4.02394437789917
+        }
+      }
+    },
+    {
+      "step": 30,
+      "loss": -7.629478693008423,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.591862201690674,
+          "negative_logprob_mean": -4.8965630531311035,
+          "topk_positive_logprob_mean": -3.924151659011841
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.841192722320557,
+          "negative_logprob_mean": -4.47081184387207,
+          "topk_positive_logprob_mean": -4.461705207824707
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.645135879516602,
+          "negative_logprob_mean": -4.802958965301514,
+          "topk_positive_logprob_mean": -3.919174909591675
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.386366367340088,
+          "negative_logprob_mean": -5.228673458099365,
+          "topk_positive_logprob_mean": -3.911780595779419
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.452348709106445,
+          "negative_logprob_mean": -5.0567522048950195,
+          "topk_positive_logprob_mean": -3.8765664100646973
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.532570838928223,
+          "negative_logprob_mean": -4.827065944671631,
+          "topk_positive_logprob_mean": -4.078217506408691
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.44216251373291,
+          "negative_logprob_mean": -4.995809078216553,
+          "topk_positive_logprob_mean": -3.9653358459472656
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.394528865814209,
+          "negative_logprob_mean": -5.256577014923096,
+          "topk_positive_logprob_mean": -3.768800735473633
+        }
+      }
+    },
+    {
+      "step": 40,
+      "loss": -11.703422546386719,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.168489456176758,
+          "negative_logprob_mean": -6.30500602722168,
+          "topk_positive_logprob_mean": -3.5338990688323975
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.359992980957031,
+          "negative_logprob_mean": -5.210883617401123,
+          "topk_positive_logprob_mean": -3.9431874752044678
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.646770000457764,
+          "negative_logprob_mean": -4.786521911621094,
+          "topk_positive_logprob_mean": -3.950171709060669
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.399947643280029,
+          "negative_logprob_mean": -5.159092903137207,
+          "topk_positive_logprob_mean": -3.9154605865478516
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.49673318862915,
+          "negative_logprob_mean": -4.934065341949463,
+          "topk_positive_logprob_mean": -3.9730756282806396
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.192989826202393,
+          "negative_logprob_mean": -5.531713962554932,
+          "topk_positive_logprob_mean": -3.839808702468872
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.447662353515625,
+          "negative_logprob_mean": -5.095342636108398,
+          "topk_positive_logprob_mean": -3.966248035430908
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.448678493499756,
+          "negative_logprob_mean": -5.590730667114258,
+          "topk_positive_logprob_mean": -3.78808331489563
+        }
+      }
+    },
+    {
+      "step": 50,
+      "loss": -18.156952619552612,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.183964252471924,
+          "negative_logprob_mean": -7.248170852661133,
+          "topk_positive_logprob_mean": -3.3421051502227783
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.335847854614258,
+          "negative_logprob_mean": -5.1217875480651855,
+          "topk_positive_logprob_mean": -3.907515287399292
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.331584453582764,
+          "negative_logprob_mean": -5.3025970458984375,
+          "topk_positive_logprob_mean": -3.6923294067382812
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.052872657775879,
+          "negative_logprob_mean": -7.064026832580566,
+          "topk_positive_logprob_mean": -3.491501569747925
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.39636754989624,
+          "negative_logprob_mean": -5.173696041107178,
+          "topk_positive_logprob_mean": -3.7986698150634766
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.094147205352783,
+          "negative_logprob_mean": -5.998380661010742,
+          "topk_positive_logprob_mean": -3.6847801208496094
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.583800792694092,
+          "negative_logprob_mean": -4.865603923797607,
+          "topk_positive_logprob_mean": -3.9933412075042725
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.130887508392334,
+          "negative_logprob_mean": -6.720713138580322,
+          "topk_positive_logprob_mean": -3.427780866622925
+        }
+      }
+    },
+    {
+      "step": 60,
+      "loss": -25.533323049545288,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.18530797958374,
+          "negative_logprob_mean": -7.408951282501221,
+          "topk_positive_logprob_mean": -3.2909696102142334
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.307503700256348,
+          "negative_logprob_mean": -5.603641986846924,
+          "topk_positive_logprob_mean": -3.807239294052124
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.13149356842041,
+          "negative_logprob_mean": -6.629816055297852,
+          "topk_positive_logprob_mean": -3.4119019508361816
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.0312676429748535,
+          "negative_logprob_mean": -6.885646820068359,
+          "topk_positive_logprob_mean": -3.544210910797119
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.0627570152282715,
+          "negative_logprob_mean": -7.288223743438721,
+          "topk_positive_logprob_mean": -3.4193665981292725
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.065058708190918,
+          "negative_logprob_mean": -6.237342357635498,
+          "topk_positive_logprob_mean": -3.682138442993164
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.175910472869873,
+          "negative_logprob_mean": -5.870280742645264,
+          "topk_positive_logprob_mean": -3.6702077388763428
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.103920936584473,
+          "negative_logprob_mean": -7.802573204040527,
+          "topk_positive_logprob_mean": -3.3671185970306396
+        }
+      }
+    },
+    {
+      "step": 70,
+      "loss": -23.471667051315308,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.1631550788879395,
+          "negative_logprob_mean": -6.976705551147461,
+          "topk_positive_logprob_mean": -3.4050183296203613
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.235176086425781,
+          "negative_logprob_mean": -5.602142810821533,
+          "topk_positive_logprob_mean": -3.6795272827148438
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.17542839050293,
+          "negative_logprob_mean": -6.1803436279296875,
+          "topk_positive_logprob_mean": -3.493293046951294
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.053915023803711,
+          "negative_logprob_mean": -6.970577239990234,
+          "topk_positive_logprob_mean": -3.4912421703338623
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.088291645050049,
+          "negative_logprob_mean": -6.289102554321289,
+          "topk_positive_logprob_mean": -3.587493658065796
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.049655914306641,
+          "negative_logprob_mean": -6.99454402923584,
+          "topk_positive_logprob_mean": -3.51086688041687
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.580191612243652,
+          "negative_logprob_mean": -4.9171037673950195,
+          "topk_positive_logprob_mean": -3.9040963649749756
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.130140781402588,
+          "negative_logprob_mean": -7.912563323974609,
+          "topk_positive_logprob_mean": -3.2998783588409424
+        }
+      }
+    },
+    {
+      "step": 80,
+      "loss": -27.475718021392822,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.197750091552734,
+          "negative_logprob_mean": -7.824367046356201,
+          "topk_positive_logprob_mean": -3.2880115509033203
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.117807388305664,
+          "negative_logprob_mean": -6.1829681396484375,
+          "topk_positive_logprob_mean": -3.578345537185669
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.1317901611328125,
+          "negative_logprob_mean": -6.698783874511719,
+          "topk_positive_logprob_mean": -3.381002902984619
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.0343146324157715,
+          "negative_logprob_mean": -7.645792007446289,
+          "topk_positive_logprob_mean": -3.463693380355835
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.466989040374756,
+          "negative_logprob_mean": -4.94704008102417,
+          "topk_positive_logprob_mean": -4.006141185760498
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.0499043464660645,
+          "negative_logprob_mean": -7.23201322555542,
+          "topk_positive_logprob_mean": -3.4703075885772705
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.073055744171143,
+          "negative_logprob_mean": -6.626893043518066,
+          "topk_positive_logprob_mean": -3.518263339996338
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.1334123611450195,
+          "negative_logprob_mean": -8.315916061401367,
+          "topk_positive_logprob_mean": -3.2922897338867188
+        }
+      }
+    },
+    {
+      "step": 90,
+      "loss": -25.885306119918823,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.212597370147705,
+          "negative_logprob_mean": -7.472548484802246,
+          "topk_positive_logprob_mean": -3.2819550037384033
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.229916095733643,
+          "negative_logprob_mean": -5.599510192871094,
+          "topk_positive_logprob_mean": -3.676409959793091
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.154812335968018,
+          "negative_logprob_mean": -6.134917259216309,
+          "topk_positive_logprob_mean": -3.5133843421936035
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.022295951843262,
+          "negative_logprob_mean": -7.318334579467773,
+          "topk_positive_logprob_mean": -3.5156619548797607
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.075298309326172,
+          "negative_logprob_mean": -7.314207077026367,
+          "topk_positive_logprob_mean": -3.414267063140869
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.519312858581543,
+          "negative_logprob_mean": -4.918519973754883,
+          "topk_positive_logprob_mean": -4.001734733581543
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.073660850524902,
+          "negative_logprob_mean": -6.879510879516602,
+          "topk_positive_logprob_mean": -3.465838670730591
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.13743782043457,
+          "negative_logprob_mean": -8.403738975524902,
+          "topk_positive_logprob_mean": -3.286729574203491
+        }
+      }
+    },
+    {
+      "step": 100,
+      "loss": -30.384086847305298,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.188194274902344,
+          "negative_logprob_mean": -8.071333885192871,
+          "topk_positive_logprob_mean": -3.289734363555908
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.083439350128174,
+          "negative_logprob_mean": -6.418894290924072,
+          "topk_positive_logprob_mean": -3.5500457286834717
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.23387336730957,
+          "negative_logprob_mean": -5.675453186035156,
+          "topk_positive_logprob_mean": -3.588238477706909
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.0371904373168945,
+          "negative_logprob_mean": -7.720204830169678,
+          "topk_positive_logprob_mean": -3.4351539611816406
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.072699546813965,
+          "negative_logprob_mean": -7.500279426574707,
+          "topk_positive_logprob_mean": -3.386401891708374
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.043122291564941,
+          "negative_logprob_mean": -7.19571590423584,
+          "topk_positive_logprob_mean": -3.4876606464385986
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.0463175773620605,
+          "negative_logprob_mean": -7.158469200134277,
+          "topk_positive_logprob_mean": -3.4387950897216797
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.137157440185547,
+          "negative_logprob_mean": -8.128118515014648,
+          "topk_positive_logprob_mean": -3.308351993560791
+        }
+      }
+    },
+    {
+      "step": 110,
+      "loss": -28.06663417816162,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.204394817352295,
+          "negative_logprob_mean": -7.959510326385498,
+          "topk_positive_logprob_mean": -3.2416293621063232
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.228574275970459,
+          "negative_logprob_mean": -5.541243076324463,
+          "topk_positive_logprob_mean": -3.7456016540527344
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.134274482727051,
+          "negative_logprob_mean": -6.028071880340576,
+          "topk_positive_logprob_mean": -3.593465805053711
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.027889728546143,
+          "negative_logprob_mean": -8.10939884185791,
+          "topk_positive_logprob_mean": -3.453933000564575
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.0635199546813965,
+          "negative_logprob_mean": -6.432165145874023,
+          "topk_positive_logprob_mean": -3.5713634490966797
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.042583465576172,
+          "negative_logprob_mean": -7.029971122741699,
+          "topk_positive_logprob_mean": -3.4995205402374268
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.0613508224487305,
+          "negative_logprob_mean": -7.022255897521973,
+          "topk_positive_logprob_mean": -3.417038679122925
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.112960338592529,
+          "negative_logprob_mean": -7.819079399108887,
+          "topk_positive_logprob_mean": -3.3525092601776123
+        }
+      }
+    },
+    {
+      "step": 120,
+      "loss": -26.65683388710022,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.168867111206055,
+          "negative_logprob_mean": -7.433638095855713,
+          "topk_positive_logprob_mean": -3.3728179931640625
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.189847946166992,
+          "negative_logprob_mean": -5.940787315368652,
+          "topk_positive_logprob_mean": -3.6202125549316406
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.135454177856445,
+          "negative_logprob_mean": -7.022943019866943,
+          "topk_positive_logprob_mean": -3.304490804672241
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.038217544555664,
+          "negative_logprob_mean": -7.804439544677734,
+          "topk_positive_logprob_mean": -3.426666259765625
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.246679782867432,
+          "negative_logprob_mean": -5.529637336730957,
+          "topk_positive_logprob_mean": -3.6949150562286377
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.058743000030518,
+          "negative_logprob_mean": -6.54905891418457,
+          "topk_positive_logprob_mean": -3.5344650745391846
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.221896171569824,
+          "negative_logprob_mean": -5.81410026550293,
+          "topk_positive_logprob_mean": -3.6251378059387207
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.149937629699707,
+          "negative_logprob_mean": -8.403727531433105,
+          "topk_positive_logprob_mean": -3.2627923488616943
+        }
+      }
+    },
+    {
+      "step": 130,
+      "loss": -29.088669061660767,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.198622226715088,
+          "negative_logprob_mean": -8.02553653717041,
+          "topk_positive_logprob_mean": -3.285862684249878
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.145500183105469,
+          "negative_logprob_mean": -5.826022148132324,
+          "topk_positive_logprob_mean": -3.6929938793182373
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.15415096282959,
+          "negative_logprob_mean": -7.146855354309082,
+          "topk_positive_logprob_mean": -3.256120443344116
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.01694917678833,
+          "negative_logprob_mean": -7.416598320007324,
+          "topk_positive_logprob_mean": -3.544567108154297
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.0695576667785645,
+          "negative_logprob_mean": -7.407674312591553,
+          "topk_positive_logprob_mean": -3.3975179195404053
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.145359516143799,
+          "negative_logprob_mean": -5.775649070739746,
+          "topk_positive_logprob_mean": -3.709841251373291
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.077268600463867,
+          "negative_logprob_mean": -6.56588077545166,
+          "topk_positive_logprob_mean": -3.528196096420288
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.143194198608398,
+          "negative_logprob_mean": -8.606611251831055,
+          "topk_positive_logprob_mean": -3.267059326171875
+        }
+      }
+    },
+    {
+      "step": 140,
+      "loss": -25.61343479156494,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.153414249420166,
+          "negative_logprob_mean": -7.5494585037231445,
+          "topk_positive_logprob_mean": -3.3775794506073
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.087544918060303,
+          "negative_logprob_mean": -6.673381328582764,
+          "topk_positive_logprob_mean": -3.4999923706054688
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.170949459075928,
+          "negative_logprob_mean": -6.098018646240234,
+          "topk_positive_logprob_mean": -3.5257251262664795
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.027883529663086,
+          "negative_logprob_mean": -7.77661657333374,
+          "topk_positive_logprob_mean": -3.4516944885253906
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.128937721252441,
+          "negative_logprob_mean": -6.3571648597717285,
+          "topk_positive_logprob_mean": -3.562580108642578
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.232877731323242,
+          "negative_logprob_mean": -5.587551116943359,
+          "topk_positive_logprob_mean": -3.659621477127075
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.414397716522217,
+          "negative_logprob_mean": -5.186465263366699,
+          "topk_positive_logprob_mean": -3.763613224029541
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.147675037384033,
+          "negative_logprob_mean": -8.472150802612305,
+          "topk_positive_logprob_mean": -3.2465660572052
+        }
+      }
+    },
+    {
+      "step": 150,
+      "loss": -25.061225414276123,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.554754734039307,
+          "negative_logprob_mean": -5.097261428833008,
+          "topk_positive_logprob_mean": -3.766096830368042
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.098982334136963,
+          "negative_logprob_mean": -6.573896408081055,
+          "topk_positive_logprob_mean": -3.4862077236175537
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.142958164215088,
+          "negative_logprob_mean": -6.239931106567383,
+          "topk_positive_logprob_mean": -3.5166046619415283
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.025118350982666,
+          "negative_logprob_mean": -7.473194599151611,
+          "topk_positive_logprob_mean": -3.5297398567199707
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.07253360748291,
+          "negative_logprob_mean": -7.481968879699707,
+          "topk_positive_logprob_mean": -3.3922595977783203
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.494230270385742,
+          "negative_logprob_mean": -4.931149959564209,
+          "topk_positive_logprob_mean": -3.982654333114624
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.055446147918701,
+          "negative_logprob_mean": -6.98375940322876,
+          "topk_positive_logprob_mean": -3.4571518898010254
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.143581390380859,
+          "negative_logprob_mean": -8.664507865905762,
+          "topk_positive_logprob_mean": -3.2537293434143066
+        }
+      }
+    },
+    {
+      "step": 160,
+      "loss": -26.90082597732544,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.188097953796387,
+          "negative_logprob_mean": -6.702810287475586,
+          "topk_positive_logprob_mean": -3.395801544189453
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.191550254821777,
+          "negative_logprob_mean": -5.728188991546631,
+          "topk_positive_logprob_mean": -3.6656715869903564
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.136561393737793,
+          "negative_logprob_mean": -7.446285247802734,
+          "topk_positive_logprob_mean": -3.222614288330078
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.04104471206665,
+          "negative_logprob_mean": -6.922326564788818,
+          "topk_positive_logprob_mean": -3.5611228942871094
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.1721110343933105,
+          "negative_logprob_mean": -5.755908489227295,
+          "topk_positive_logprob_mean": -3.674497604370117
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.040029525756836,
+          "negative_logprob_mean": -6.415737152099609,
+          "topk_positive_logprob_mean": -3.6797096729278564
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.065376281738281,
+          "negative_logprob_mean": -7.206608772277832,
+          "topk_positive_logprob_mean": -3.395102024078369
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.146046161651611,
+          "negative_logprob_mean": -8.588105201721191,
+          "topk_positive_logprob_mean": -3.270625352859497
+        }
+      }
+    },
+    {
+      "step": 170,
+      "loss": -28.617188692092896,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.1109795570373535,
+          "negative_logprob_mean": -7.45417594909668,
+          "topk_positive_logprob_mean": -3.420988082885742
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.087937355041504,
+          "negative_logprob_mean": -6.516862869262695,
+          "topk_positive_logprob_mean": -3.5402488708496094
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.146310329437256,
+          "negative_logprob_mean": -6.022006511688232,
+          "topk_positive_logprob_mean": -3.559555768966675
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.03279972076416,
+          "negative_logprob_mean": -7.956755638122559,
+          "topk_positive_logprob_mean": -3.435131788253784
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.117345333099365,
+          "negative_logprob_mean": -6.330466270446777,
+          "topk_positive_logprob_mean": -3.54162335395813
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.027188777923584,
+          "negative_logprob_mean": -6.544789791107178,
+          "topk_positive_logprob_mean": -3.6538548469543457
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.067849159240723,
+          "negative_logprob_mean": -6.901324272155762,
+          "topk_positive_logprob_mean": -3.4435136318206787
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.149015426635742,
+          "negative_logprob_mean": -8.743103981018066,
+          "topk_positive_logprob_mean": -3.2573800086975098
+        }
+      }
+    },
+    {
+      "step": 180,
+      "loss": -29.953245878219604,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.18446683883667,
+          "negative_logprob_mean": -7.392741680145264,
+          "topk_positive_logprob_mean": -3.319836378097534
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.132812023162842,
+          "negative_logprob_mean": -5.965378284454346,
+          "topk_positive_logprob_mean": -3.6404197216033936
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.125469207763672,
+          "negative_logprob_mean": -6.416321754455566,
+          "topk_positive_logprob_mean": -3.4887566566467285
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.0186357498168945,
+          "negative_logprob_mean": -7.944490909576416,
+          "topk_positive_logprob_mean": -3.466693162918091
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.0659284591674805,
+          "negative_logprob_mean": -7.298141956329346,
+          "topk_positive_logprob_mean": -3.433760404586792
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.039942264556885,
+          "negative_logprob_mean": -7.527732849121094,
+          "topk_positive_logprob_mean": -3.454401731491089
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.093552112579346,
+          "negative_logprob_mean": -6.376151084899902,
+          "topk_positive_logprob_mean": -3.56207013130188
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.147842884063721,
+          "negative_logprob_mean": -8.655183792114258,
+          "topk_positive_logprob_mean": -3.2569580078125
+        }
+      }
+    },
+    {
+      "step": 190,
+      "loss": -31.776503324508667,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.202785968780518,
+          "negative_logprob_mean": -7.934562683105469,
+          "topk_positive_logprob_mean": -3.2444024085998535
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.099781036376953,
+          "negative_logprob_mean": -6.691375732421875,
+          "topk_positive_logprob_mean": -3.4882965087890625
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.097658634185791,
+          "negative_logprob_mean": -6.590981483459473,
+          "topk_positive_logprob_mean": -3.4719295501708984
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.01961612701416,
+          "negative_logprob_mean": -7.470762729644775,
+          "topk_positive_logprob_mean": -3.497190237045288
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.082130432128906,
+          "negative_logprob_mean": -7.209556579589844,
+          "topk_positive_logprob_mean": -3.3895251750946045
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.03658390045166,
+          "negative_logprob_mean": -7.555494785308838,
+          "topk_positive_logprob_mean": -3.469130039215088
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.063716411590576,
+          "negative_logprob_mean": -6.935166358947754,
+          "topk_positive_logprob_mean": -3.453606367111206
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.162813186645508,
+          "negative_logprob_mean": -8.630043983459473,
+          "topk_positive_logprob_mean": -3.227360963821411
+        }
+      }
+    },
+    {
+      "step": 200,
+      "loss": -27.98536443710327,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.198222637176514,
+          "negative_logprob_mean": -7.507928371429443,
+          "topk_positive_logprob_mean": -3.304574728012085
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.139506816864014,
+          "negative_logprob_mean": -6.005979061126709,
+          "topk_positive_logprob_mean": -3.6000258922576904
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.123814105987549,
+          "negative_logprob_mean": -7.291337013244629,
+          "topk_positive_logprob_mean": -3.307145833969116
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.0348429679870605,
+          "negative_logprob_mean": -7.936618328094482,
+          "topk_positive_logprob_mean": -3.4387269020080566
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.109259605407715,
+          "negative_logprob_mean": -6.132595062255859,
+          "topk_positive_logprob_mean": -3.626628875732422
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.134720325469971,
+          "negative_logprob_mean": -5.849009990692139,
+          "topk_positive_logprob_mean": -3.6792876720428467
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.0937299728393555,
+          "negative_logprob_mean": -6.508080959320068,
+          "topk_positive_logprob_mean": -3.5119826793670654
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.145400047302246,
+          "negative_logprob_mean": -8.49002456665039,
+          "topk_positive_logprob_mean": -3.267836809158325
+        }
+      }
+    },
+    {
+      "step": 210,
+      "loss": -28.17361569404602,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.229674339294434,
+          "negative_logprob_mean": -7.883908748626709,
+          "topk_positive_logprob_mean": -3.2468183040618896
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.383089065551758,
+          "negative_logprob_mean": -5.085260391235352,
+          "topk_positive_logprob_mean": -3.9111015796661377
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.12618350982666,
+          "negative_logprob_mean": -7.281594276428223,
+          "topk_positive_logprob_mean": -3.277238607406616
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -3.996647357940674,
+          "negative_logprob_mean": -8.442229270935059,
+          "topk_positive_logprob_mean": -3.4830214977264404
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.340269565582275,
+          "negative_logprob_mean": -5.119976043701172,
+          "topk_positive_logprob_mean": -3.9609405994415283
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.085803508758545,
+          "negative_logprob_mean": -6.316908359527588,
+          "topk_positive_logprob_mean": -3.578540802001953
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.048293113708496,
+          "negative_logprob_mean": -7.184866905212402,
+          "topk_positive_logprob_mean": -3.44256854057312
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.1784210205078125,
+          "negative_logprob_mean": -8.950088500976562,
+          "topk_positive_logprob_mean": -3.1909866333007812
+        }
+      }
+    },
+    {
+      "step": 220,
+      "loss": -27.03898596763611,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.22648286819458,
+          "negative_logprob_mean": -8.316900253295898,
+          "topk_positive_logprob_mean": -3.2383973598480225
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.106990814208984,
+          "negative_logprob_mean": -6.37455940246582,
+          "topk_positive_logprob_mean": -3.5474331378936768
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.106184959411621,
+          "negative_logprob_mean": -6.519252777099609,
+          "topk_positive_logprob_mean": -3.4808309078216553
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.036811351776123,
+          "negative_logprob_mean": -6.927576065063477,
+          "topk_positive_logprob_mean": -3.560292959213257
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.079324722290039,
+          "negative_logprob_mean": -7.276893138885498,
+          "topk_positive_logprob_mean": -3.4277031421661377
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.43534517288208,
+          "negative_logprob_mean": -4.94942569732666,
+          "topk_positive_logprob_mean": -3.9752023220062256
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.306872844696045,
+          "negative_logprob_mean": -5.495174407958984,
+          "topk_positive_logprob_mean": -3.7120766639709473
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.182854652404785,
+          "negative_logprob_mean": -9.300106048583984,
+          "topk_positive_logprob_mean": -3.1789650917053223
+        }
+      }
+    },
+    {
+      "step": 230,
+      "loss": -30.33353090286255,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.218681335449219,
+          "negative_logprob_mean": -8.2354154586792,
+          "topk_positive_logprob_mean": -3.2344110012054443
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.091358661651611,
+          "negative_logprob_mean": -6.285278797149658,
+          "topk_positive_logprob_mean": -3.592390537261963
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.135339736938477,
+          "negative_logprob_mean": -7.5467352867126465,
+          "topk_positive_logprob_mean": -3.214012861251831
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.032179355621338,
+          "negative_logprob_mean": -7.920129299163818,
+          "topk_positive_logprob_mean": -3.425710439682007
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.366377353668213,
+          "negative_logprob_mean": -5.181760311126709,
+          "topk_positive_logprob_mean": -3.83817458152771
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.0478315353393555,
+          "negative_logprob_mean": -6.696602821350098,
+          "topk_positive_logprob_mean": -3.5528740882873535
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.067436218261719,
+          "negative_logprob_mean": -7.272260665893555,
+          "topk_positive_logprob_mean": -3.3910348415374756
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.159723281860352,
+          "negative_logprob_mean": -8.669402122497559,
+          "topk_positive_logprob_mean": -3.2254459857940674
+        }
+      }
+    },
+    {
+      "step": 240,
+      "loss": -29.14324951171875,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.149333477020264,
+          "negative_logprob_mean": -7.718171119689941,
+          "topk_positive_logprob_mean": -3.379075765609741
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.0964531898498535,
+          "negative_logprob_mean": -6.547878265380859,
+          "topk_positive_logprob_mean": -3.4734344482421875
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.0764312744140625,
+          "negative_logprob_mean": -6.8532304763793945,
+          "topk_positive_logprob_mean": -3.4054811000823975
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.04409646987915,
+          "negative_logprob_mean": -7.841188907623291,
+          "topk_positive_logprob_mean": -3.4213712215423584
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.061737060546875,
+          "negative_logprob_mean": -6.4423723220825195,
+          "topk_positive_logprob_mean": -3.614546298980713
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.187856197357178,
+          "negative_logprob_mean": -5.680878639221191,
+          "topk_positive_logprob_mean": -3.6667728424072266
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.067381381988525,
+          "negative_logprob_mean": -6.995457649230957,
+          "topk_positive_logprob_mean": -3.4131157398223877
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.132275104522705,
+          "negative_logprob_mean": -8.698667526245117,
+          "topk_positive_logprob_mean": -3.2607979774475098
+        }
+      }
+    },
+    {
+      "step": 250,
+      "loss": -29.876725673675537,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.175008773803711,
+          "negative_logprob_mean": -8.33092212677002,
+          "topk_positive_logprob_mean": -3.282729387283325
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.244670391082764,
+          "negative_logprob_mean": -5.638482570648193,
+          "topk_positive_logprob_mean": -3.688649892807007
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.111186504364014,
+          "negative_logprob_mean": -6.679529666900635,
+          "topk_positive_logprob_mean": -3.444685697555542
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.0158796310424805,
+          "negative_logprob_mean": -7.9053053855896,
+          "topk_positive_logprob_mean": -3.4879472255706787
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.063382625579834,
+          "negative_logprob_mean": -7.643205165863037,
+          "topk_positive_logprob_mean": -3.3680436611175537
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.2213335037231445,
+          "negative_logprob_mean": -5.38392448425293,
+          "topk_positive_logprob_mean": -3.8854637145996094
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.06105899810791,
+          "negative_logprob_mean": -7.44195556640625,
+          "topk_positive_logprob_mean": -3.385040044784546
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.14321756362915,
+          "negative_logprob_mean": -8.642626762390137,
+          "topk_positive_logprob_mean": -3.246666669845581
+        }
+      }
+    },
+    {
+      "step": 260,
+      "loss": -26.828986406326294,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.137113094329834,
+          "negative_logprob_mean": -6.976560115814209,
+          "topk_positive_logprob_mean": -3.4286561012268066
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.254705905914307,
+          "negative_logprob_mean": -5.54900598526001,
+          "topk_positive_logprob_mean": -3.7434487342834473
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.078840732574463,
+          "negative_logprob_mean": -7.183750629425049,
+          "topk_positive_logprob_mean": -3.3484134674072266
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.039406776428223,
+          "negative_logprob_mean": -6.847171306610107,
+          "topk_positive_logprob_mean": -3.5375382900238037
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.180902481079102,
+          "negative_logprob_mean": -5.915093898773193,
+          "topk_positive_logprob_mean": -3.6363792419433594
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.039321422576904,
+          "negative_logprob_mean": -6.964591979980469,
+          "topk_positive_logprob_mean": -3.5243337154388428
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.062110900878906,
+          "negative_logprob_mean": -6.784485816955566,
+          "topk_positive_logprob_mean": -3.5163376331329346
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.146234512329102,
+          "negative_logprob_mean": -8.611008644104004,
+          "topk_positive_logprob_mean": -3.2675747871398926
+        }
+      }
+    },
+    {
+      "step": 270,
+      "loss": -28.71422266960144,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.184792518615723,
+          "negative_logprob_mean": -7.847012996673584,
+          "topk_positive_logprob_mean": -3.2933318614959717
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.08953857421875,
+          "negative_logprob_mean": -6.680318832397461,
+          "topk_positive_logprob_mean": -3.505815267562866
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.139503479003906,
+          "negative_logprob_mean": -7.357804775238037,
+          "topk_positive_logprob_mean": -3.2680420875549316
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.014867305755615,
+          "negative_logprob_mean": -8.148212432861328,
+          "topk_positive_logprob_mean": -3.4511170387268066
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.291951656341553,
+          "negative_logprob_mean": -5.196259498596191,
+          "topk_positive_logprob_mean": -3.960456132888794
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.04599666595459,
+          "negative_logprob_mean": -6.668651103973389,
+          "topk_positive_logprob_mean": -3.565633773803711
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.174205780029297,
+          "negative_logprob_mean": -5.9644389152526855,
+          "topk_positive_logprob_mean": -3.6000306606292725
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.151208877563477,
+          "negative_logprob_mean": -8.719470024108887,
+          "topk_positive_logprob_mean": -3.2235190868377686
+        }
+      }
+    },
+    {
+      "step": 280,
+      "loss": -30.184248685836792,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.242842197418213,
+          "negative_logprob_mean": -8.44467830657959,
+          "topk_positive_logprob_mean": -3.217000722885132
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.15952730178833,
+          "negative_logprob_mean": -5.888614177703857,
+          "topk_positive_logprob_mean": -3.633113145828247
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.07529354095459,
+          "negative_logprob_mean": -7.18699312210083,
+          "topk_positive_logprob_mean": -3.3552727699279785
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.050418376922607,
+          "negative_logprob_mean": -7.048223495483398,
+          "topk_positive_logprob_mean": -3.4818742275238037
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.104513645172119,
+          "negative_logprob_mean": -6.161728382110596,
+          "topk_positive_logprob_mean": -3.6176135540008545
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.034473419189453,
+          "negative_logprob_mean": -7.600546836853027,
+          "topk_positive_logprob_mean": -3.4598960876464844
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.068297863006592,
+          "negative_logprob_mean": -7.3056230545043945,
+          "topk_positive_logprob_mean": -3.3598194122314453
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.187850475311279,
+          "negative_logprob_mean": -8.001359939575195,
+          "topk_positive_logprob_mean": -3.3289284706115723
+        }
+      }
+    },
+    {
+      "step": 290,
+      "loss": -32.89537334442139,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.2237467765808105,
+          "negative_logprob_mean": -8.192875862121582,
+          "topk_positive_logprob_mean": -3.2347848415374756
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.069499492645264,
+          "negative_logprob_mean": -6.657209873199463,
+          "topk_positive_logprob_mean": -3.5397019386291504
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.109519004821777,
+          "negative_logprob_mean": -7.150888919830322,
+          "topk_positive_logprob_mean": -3.3479042053222656
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.019834995269775,
+          "negative_logprob_mean": -7.705551624298096,
+          "topk_positive_logprob_mean": -3.512632131576538
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.08262825012207,
+          "negative_logprob_mean": -7.0596442222595215,
+          "topk_positive_logprob_mean": -3.4305946826934814
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.040727138519287,
+          "negative_logprob_mean": -7.438228130340576,
+          "topk_positive_logprob_mean": -3.471097230911255
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.071017742156982,
+          "negative_logprob_mean": -6.728071689605713,
+          "topk_positive_logprob_mean": -3.518801212310791
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.164924144744873,
+          "negative_logprob_mean": -9.228523254394531,
+          "topk_positive_logprob_mean": -3.210103750228882
+        }
+      }
+    },
+    {
+      "step": 299,
+      "loss": -31.969194173812866,
+      "surrogates": {
+        "ViT-H-14:laion2b_s32b_b79k": {
+          "positive_logprob_mean": -4.2321906089782715,
+          "negative_logprob_mean": -8.451794624328613,
+          "topk_positive_logprob_mean": -3.204669237136841
+        },
+        "ViT-H-14:metaclip_fullcc": {
+          "positive_logprob_mean": -4.092504024505615,
+          "negative_logprob_mean": -6.548102378845215,
+          "topk_positive_logprob_mean": -3.4811713695526123
+        },
+        "ViT-H-14:metaclip_altogether": {
+          "positive_logprob_mean": -4.080430030822754,
+          "negative_logprob_mean": -7.212538719177246,
+          "topk_positive_logprob_mean": -3.3626556396484375
+        },
+        "ViT-H-14-378:dfn5b": {
+          "positive_logprob_mean": -4.013848781585693,
+          "negative_logprob_mean": -8.460986137390137,
+          "topk_positive_logprob_mean": -3.4636025428771973
+        },
+        "ViT-B-16-SigLIP:webli": {
+          "positive_logprob_mean": -4.065636157989502,
+          "negative_logprob_mean": -7.463741302490234,
+          "topk_positive_logprob_mean": -3.40545654296875
+        },
+        "ViT-B-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.2985687255859375,
+          "negative_logprob_mean": -5.267776966094971,
+          "topk_positive_logprob_mean": -3.8577682971954346
+        },
+        "ViT-L-16-SigLIP-384:webli": {
+          "positive_logprob_mean": -4.0446038246154785,
+          "negative_logprob_mean": -7.101302146911621,
+          "topk_positive_logprob_mean": -3.4753663539886475
+        },
+        "convnext_xxlarge:laion2b_s34b_b82k_augreg": {
+          "positive_logprob_mean": -4.173793315887451,
+          "negative_logprob_mean": -8.898276329040527,
+          "topk_positive_logprob_mean": -3.1846346855163574
+        }
+      }
+    }
+  ]
+}

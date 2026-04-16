@@ -14,9 +14,10 @@ The current completed run uses the local Caltech101 demo manifest:
 data/caltech_large/manifest.json
 ```
 
-The uploaded result snapshot contains 4 completed attack items. The wrapper now
-regenerates the Caltech101 demo manifest when fewer than the requested item
-count exists, so the 50 item by 300 step run is:
+The uploaded full result snapshots contain 50 completed attack items for both
+16/255 and 8/255 epsilon runs. The wrapper regenerates the Caltech101 demo
+manifest when fewer than the requested item count exists, so the 50 item by 300
+step run is:
 
 ```bash
 bash scripts/run_experiment.sh full-matrix \
@@ -176,44 +177,46 @@ PYTHONPATH=src .venv/bin/python scripts/replay_gpt_eval.py \
 
 ## Current Result
 
-Current completed attack output:
+Current completed attack outputs:
 
 ```text
 outputs/paper_caltech
+outputs/paper_caltech_eps8
 ```
 
-Tracked uploaded result snapshot:
+Tracked uploaded result snapshots:
 
 ```text
 docs/results/paper_caltech_demo
+docs/results/paper_caltech_eps16_full
+docs/results/paper_caltech_eps8_full
 ```
 
 Attack summary:
 
 ```text
-completed items: 4
-proxy success: 4 / 4 = 100%
-average margin gain: 0.5736
+16/255 proxy success: 50 / 50 = 100%
+16/255 average margin gain: 0.6020
+8/255 proxy success: 49 / 50 = 98%
+8/255 average margin gain: 0.5362
 ```
 
-Per-item transfer replay results:
+Transfer replay results:
 
-| Item | Source | Target | GPT-4o | GPT-5-mini |
-| --- | --- | --- | --- | --- |
-| item_00 | car | dog | success | success |
-| item_01 | dog | watch | success | success |
-| item_02 | watch | laptop | success | success |
-| item_03 | laptop | phone | success | success |
+| Epsilon | GPT-4o | GPT-5-mini |
+| --- | ---: | ---: |
+| 16/255 | 48 / 50 = 96% | 48 / 50 = 96% |
+| 8/255 | 43 / 50 = 86% | 44 / 50 = 88% |
 
-Replay ASR:
+Detailed analysis:
 
 ```text
-GPT-4o:     4 / 4 = 100%
-GPT-5-mini: 4 / 4 = 100%
+docs/results/full-experiment-analysis.md
 ```
 
-Generated replay files are under `outputs/paper_caltech/` and remain ignored by
-Git. The compact tracked copy is under `docs/results/paper_caltech_demo/`.
+Generated replay files are under `outputs/paper_caltech/` and
+`outputs/paper_caltech_eps8/`; both output trees remain ignored by Git. The
+compact tracked copies are under `docs/results/`.
 
 ```text
 eval_gpt4o.jsonl
