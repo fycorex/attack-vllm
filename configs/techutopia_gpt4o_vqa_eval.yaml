@@ -1,0 +1,26 @@
+# TechUtopia Copilot OpenAI-compatible VQA/text-answer victim/judge config.
+experiment_name: "techutopia-gpt4o-vqa-eval"
+
+evaluation:
+  gpt_victim:
+    enabled: true
+    model_name: "gpt-4o"
+    task_type: "vqa"
+    api_mode: "chat_completions"
+    prompt_mode: "freeform"
+    success_mode: "judge"
+    require_source_absent: false
+    max_output_tokens: 64
+    temperature: 0.0
+    api_key_env: "TECHUTOPIA_API_KEY"
+    base_url: "https://copilot.techutopia.cn"
+    request_user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    request_timeout_seconds: 120
+    max_retries: 4
+    retry_backoff_seconds: 10.0
+    judge_model_name: "gpt-4o"
+    judge_api_mode: "chat_completions"
+    judge_max_output_tokens: 128
+    judge_temperature: 0.0
+    judge_api_key_env: "TECHUTOPIA_API_KEY"
+    judge_base_url: "https://copilot.techutopia.cn"

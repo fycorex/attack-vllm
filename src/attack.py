@@ -388,6 +388,7 @@ class CaptionAttackRunner:
             "target_answer_keywords": item.target_answer_keywords,
             "source_text_keywords": item.source_text_keywords,
             "target_text_keywords": item.target_text_keywords,
+            "metadata": item.metadata,
             "proxy_eval": proxy_eval,
             "caption_eval": caption_eval,
             "vqa_eval": vqa_eval,

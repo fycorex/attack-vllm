@@ -203,6 +203,10 @@ def write_item_csv(results: list[dict], path: str | Path) -> None:
         "item_id",
         "source_label",
         "target_label",
+        "question_category",
+        "question_category_name",
+        "question_type",
+        "bbox_label",
         "proxy_success",
         "clean_margin",
         "adversarial_margin",
@@ -250,11 +254,16 @@ def write_item_csv(results: list[dict], path: str | Path) -> None:
             vqa_eval = item.get("vqa_eval") or {}
             ocr_eval = item.get("ocr_eval") or {}
             gpt_eval = item.get("gpt_eval") or {}
+            metadata = item.get("metadata") or {}
             writer.writerow(
                 {
                     "item_id": item["item_id"],
                     "source_label": item["source_label"],
                     "target_label": item["target_label"],
+                    "question_category": metadata.get("question_category", ""),
+                    "question_category_name": metadata.get("question_category_name", ""),
+                    "question_type": metadata.get("question_type", ""),
+                    "bbox_label": metadata.get("bbox_label", ""),
                     "proxy_success": proxy["proxy_success"],
                     "clean_margin": proxy["clean_margin"],
                     "adversarial_margin": proxy["adversarial_margin"],

@@ -1,6 +1,6 @@
 # Current Reproduction Snapshot
 
-Date: 2026-04-15
+Date: 2026-04-16
 
 This document records the current runnable reproduction settings, architecture,
 and observed result in this checkout. It is an engineering reproduction snapshot,
@@ -217,6 +217,28 @@ docs/results/full-experiment-analysis.md
 Generated replay files are under `outputs/paper_caltech/` and
 `outputs/paper_caltech_eps8/`; both output trees remain ignored by Git. The
 compact tracked copies are under `docs/results/`.
+
+## Current VQA and Receipt Text Demo Results
+
+Additional paper-style demo outputs are now tracked for the LLaVA-Bench COCO
+VQA path and the TrainingDataPro receipt-text path:
+
+```text
+docs/results/llava_vqa_eps16_demo
+docs/results/receipt_text_eps32_demo
+docs/results/vqa-text-demo-analysis.md
+```
+
+Replay results:
+
+| Task | Epsilon | Proxy ASR | GPT-4o | GPT-5-mini |
+| --- | ---: | ---: | ---: | ---: |
+| LLaVA-Bench COCO VQA | 16/255 | 15 / 15 = 100% | 7 / 15 = 46.7% | 10 / 15 = 66.7% |
+| Receipt text | 32/255 | 10 / 10 = 100% | 2 / 10 = 20% | 3 / 10 = 30% |
+
+The VQA run uses 5 target images and 15 questions. The receipt eps32 run uses 5
+receipt images and 10 questions, so it is still demo-scale rather than the full
+20-receipt, 40-question setting.
 
 ```text
 eval_gpt4o.jsonl

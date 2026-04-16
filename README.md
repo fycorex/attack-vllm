@@ -1,9 +1,9 @@
 # Adversarial Attack on VLLMs - Practice Reproduction
 
-Practice reproduction of the transferable caption attack in
-arXiv:2505.01050v1. The repo contains a runnable Caltech101 engineering
-pipeline plus a stricter NIPS 2017/ImageNet manifest path for paper-grade
-experiments.
+Practice reproduction of the transferable VLLM attack in arXiv:2505.01050v1.
+The repo contains runnable caption, VQA, and receipt text-recognition demo
+pipelines plus a stricter NIPS 2017/ImageNet manifest path for paper-grade
+caption experiments.
 
 Paper: https://arxiv.org/html/2505.01050v1
 
@@ -14,9 +14,11 @@ Current completed local outputs:
 ```text
 outputs/paper_caltech
 outputs/paper_caltech_eps8
+outputs/llava_vqa_eps16
+outputs/receipt_text_eps32
 ```
 
-Current completed full run size:
+Current completed caption run size:
 
 ```text
 50 Caltech101 demo items
@@ -24,19 +26,42 @@ Current completed full run size:
 8 OpenCLIP surrogates
 ```
 
-Current full replay result:
+Current completed VQA/text demo sizes:
+
+```text
+LLaVA-Bench COCO VQA: 5 target images, 15 questions, epsilon = 16/255
+Receipt text eps32: 5 receipt images, 10 questions, epsilon = 32/255
+300 attack steps
+8 OpenCLIP surrogates
+```
+
+The receipt eps32 output checked here is a demo-scale run with
+`attack_limit = 10`. The full receipt-text setting remains 20 receipt images and
+40 targeted questions.
+
+Current caption replay result:
 
 | Epsilon | Proxy ASR | GPT-4o ASR | GPT-5-mini ASR |
 | --- | ---: | ---: | ---: |
 | 16/255 | 50 / 50 = 100% | 48 / 50 = 96% | 48 / 50 = 96% |
 | 8/255 | 49 / 50 = 98% | 43 / 50 = 86% | 44 / 50 = 88% |
 
-Full result analysis and uploaded images:
+Current VQA/text replay result:
+
+| Task | Epsilon | Proxy ASR | GPT-4o ASR | GPT-5-mini ASR |
+| --- | ---: | ---: | ---: | ---: |
+| LLaVA-Bench COCO VQA | 16/255 | 15 / 15 = 100% | 7 / 15 = 46.7% | 10 / 15 = 66.7% |
+| Receipt text | 32/255 | 10 / 10 = 100% | 2 / 10 = 20% | 3 / 10 = 30% |
+
+Result analysis and uploaded images:
 
 ```text
 docs/results/full-experiment-analysis.md
+docs/results/vqa-text-demo-analysis.md
 docs/results/paper_caltech_eps16_full/
 docs/results/paper_caltech_eps8_full/
+docs/results/llava_vqa_eps16_demo/
+docs/results/receipt_text_eps32_demo/
 ```
 
 This is a smoke/demo result. It confirms the attack and GPT replay path work
@@ -54,6 +79,8 @@ Uploaded result images and replay files:
 docs/results/paper_caltech_demo/
 docs/results/paper_caltech_eps16_full/
 docs/results/paper_caltech_eps8_full/
+docs/results/llava_vqa_eps16_demo/
+docs/results/receipt_text_eps32_demo/
 ```
 
 Paper reproduction checklist:
@@ -61,6 +88,12 @@ Paper reproduction checklist:
 ```text
 docs/paper-reproduction.md
 ```
+
+Surrogate audit means checking the configured surrogate checkpoint names against
+the exact paper appendix/table IDs before making paper-equivalent ASR claims.
+The current runnable configs use available OpenCLIP checkpoints from the same
+model families, but the strict appendix mapping still needs a final checkpoint
+name audit.
 
 ## Quick Start
 
@@ -116,6 +149,142 @@ PYTHONPATH=src .venv/bin/python scripts/replay_gpt_eval.py \
   --config configs/techutopia_gpt5mini_caption_eval.yaml \
   --glob 'outputs/paper_caltech/item_*/metrics.json' \
   > outputs/paper_caltech/eval_gpt5mini.jsonl
+```
+
+## LLaVA-Bench COCO VQA Demo
+
+This is the small paper-style VQA benchmark path. It downloads
+`lmms-lab/llava-bench-coco` from Hugging Face into `data/raw/hf_cache`, selects
+5 target images from the cached full split, and creates 15 attack items:
+Conversation, Detail, and Reasoning for each target image. For each item, a
+different benchmark image is selected as the source image to perturb.
+
+Run the 5-image, 15-item VQA attack with `epsilon = 16/255`:
+
+```bash
+bash scripts/run_experiment.sh llava-vqa-demo 5 300
+```
+
+Replay GPT-4o and GPT-5-mini VQA evaluation, then summarize Conversation,
+Detail, and Reasoning separately:
+
+```bash
+bash scripts/run_experiment.sh eval-llava-vqa-gpt outputs/llava_vqa_eps16
+```
+
+Run attack and replay evaluation as one command:
+
+```bash
+bash scripts/run_experiment.sh llava-vqa-demo-matrix 5 300
+```
+
+Generated data:
+
+```text
+data/llava_bench_coco_vqa/manifest.json
+```
+
+Main output:
+
+```text
+outputs/llava_vqa_eps16
+```
+
+The judge prompt is the paper's True/False VQA template. The summary file is:
+
+```text
+outputs/llava_vqa_eps16/eval_summary.json
+```
+
+Latest checked demo result:
+
+| Victim | Overall | Conversation | Detail | Reasoning |
+| --- | ---: | ---: | ---: | ---: |
+| GPT-4o | 7 / 15 = 46.7% | 2 / 5 = 40% | 1 / 5 = 20% | 4 / 5 = 80% |
+| GPT-5-mini | 10 / 15 = 66.7% | 3 / 5 = 60% | 3 / 5 = 60% | 4 / 5 = 80% |
+
+Tracked artifacts:
+
+```text
+docs/results/llava_vqa_eps16_demo/
+```
+
+## Receipt Text-Recognition
+
+This path targets the paper's retail receipt setting with
+`TrainingDataPro/ocr-receipts-text-detection`. The prep script caches the full
+Hugging Face dataset under `data/raw/hf_cache`, reads `annotations.xml`, and
+builds 40 targeted items from 20 receipt images: two explicit-text questions per
+receipt. Each target answer is intentionally incorrect, and positive examples
+render that incorrect answer into the annotated receipt region.
+
+Prepare the manifest:
+
+```bash
+bash scripts/run_experiment.sh prepare-receipt-text 20 50
+```
+
+If the dataset owner namespace resolves differently, set:
+
+```bash
+RECEIPT_DATASET_REPO=UniqueData/ocr-receipts-text-detection \
+  bash scripts/run_experiment.sh prepare-receipt-text 20 50
+```
+
+Run `epsilon = 16/255`:
+
+```bash
+bash scripts/run_experiment.sh receipt-text-16 300 20
+```
+
+Run `epsilon = 32/255`:
+
+```bash
+bash scripts/run_experiment.sh receipt-text-32 300 20
+```
+
+Replay GPT-4o and GPT-5-mini on an existing receipt-text output:
+
+```bash
+bash scripts/run_experiment.sh eval-receipt-text-gpt outputs/receipt_text_eps16
+bash scripts/run_experiment.sh eval-receipt-text-gpt outputs/receipt_text_eps32
+```
+
+One-command attack plus replay options:
+
+```bash
+bash scripts/run_experiment.sh receipt-text-16-matrix 300 20
+bash scripts/run_experiment.sh receipt-text-32-matrix 300 20
+```
+
+Generated data:
+
+```text
+data/trainingdatapro_receipts_text/manifest.json
+```
+
+Outputs:
+
+```text
+outputs/receipt_text_eps16
+outputs/receipt_text_eps32
+```
+
+Latest checked eps32 demo result:
+
+| Victim | Overall | Store | Total | Item |
+| --- | ---: | ---: | ---: | ---: |
+| GPT-4o | 2 / 10 = 20% | 1 / 5 = 20% | 0 / 4 = 0% | 1 / 1 = 100% |
+| GPT-5-mini | 3 / 10 = 30% | 1 / 5 = 20% | 1 / 4 = 25% | 1 / 1 = 100% |
+
+The checked eps32 folder contains 10 items from 5 receipts. Use
+`receipt-text-32 300 20` or `receipt-text-32-matrix 300 20` for the full
+20-receipt, 40-question setting.
+
+Tracked artifacts:
+
+```text
+docs/results/receipt_text_eps32_demo/
 ```
 
 ## Architecture
@@ -263,15 +432,26 @@ attack-vllm/
 │   ├── caption_attack_paper.yaml
 │   ├── caption_attack_paper_eps8.yaml
 │   ├── caption_attack_paper_strict_repro.yaml
+│   ├── llava_bench_vqa_eps16.yaml
+│   ├── receipt_text_eps16.yaml
+│   ├── receipt_text_eps32.yaml
 │   ├── techutopia_gpt4o_caption_eval.yaml
-│   └── techutopia_gpt5mini_caption_eval.yaml
+│   ├── techutopia_gpt4o_receipt_text_eval.yaml
+│   ├── techutopia_gpt4o_vqa_eval.yaml
+│   ├── techutopia_gpt5mini_caption_eval.yaml
+│   ├── techutopia_gpt5mini_receipt_text_eval.yaml
+│   └── techutopia_gpt5mini_vqa_eval.yaml
 ├── docs/
 │   ├── current-reproduction.md
 │   ├── paper-reproduction.md
-│   └── results/paper_caltech_demo/
+│   └── results/
 ├── scripts/
+│   ├── analyze_receipt_text_eval.py
+│   ├── analyze_vqa_eval.py
 │   ├── prepare_caltech_demo.py
+│   ├── prepare_llava_bench_coco_vqa.py
 │   ├── prepare_nips2017_caption_manifest.py
+│   ├── prepare_trainingdatapro_receipts_text.py
 │   ├── replay_gpt_eval.py
 │   ├── run_caption_attack.py
 │   └── run_experiment.sh
@@ -303,4 +483,18 @@ httpx
 openai
 PyYAML
 tqdm
+```
+
+## Citation
+
+This practice reproduction is based on:
+
+```bibtex
+@article{hu2025transferable,
+  title = {Transferable Adversarial Attacks on Black-Box Vision-Language Models},
+  author = {Hu, Kai and Yu, Weichen and Zhang, Li and Robey, Alexander and Zou, Andy and Xu, Chengming and Hu, Haoqi and Fredrikson, Matt},
+  journal = {arXiv preprint arXiv:2505.01050},
+  year = {2025},
+  url = {https://arxiv.org/abs/2505.01050}
+}
 ```

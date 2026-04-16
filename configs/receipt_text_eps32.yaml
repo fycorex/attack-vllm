@@ -1,0 +1,91 @@
+# TrainingDataPro retail receipt text-recognition setting.
+#
+# This config uses epsilon = 32/255.
+experiment_name: "receipt-text-eps32"
+
+paths:
+  manifest: "data/trainingdatapro_receipts_text/manifest.json"
+  output_dir: "outputs/receipt_text_eps32"
+  model_cache_dir: "models"
+
+runtime:
+  device: "cuda"
+  seed: 42
+  attack_limit: 40
+  attack_offset: 0
+  sequential_surrogates: false
+  enable_tf32: true
+  cudnn_benchmark: true
+
+attack:
+  image_size: 299
+  epsilon: 0.12549019607843137
+  step_size: 0.008
+  steps: 300
+  augmentation_batches: 4
+  augmentation_forward_batch_size: 4
+  metrics_interval: 10
+  temperature: 0.1
+  top_k: 10
+  relative_proxy_weight: 0.0
+  patch_drop_rate: 0.20
+  drop_path_max_rate: 0.15
+  perturbation_ema_decay: 0.99
+  gaussian_prob: 0.5
+  gaussian_scale_multiplier: 0.25
+  crop_prob: 0.5
+  crop_scale_min: 0.80
+  crop_scale_max: 1.00
+  crop_ratio_min: 0.75
+  crop_ratio_max: 1.3333333333
+  pad_prob: 0.5
+  jpeg_prob: 0.2
+  jpeg_quality_min: 0.5
+  jpeg_quality_max: 1.0
+  jpeg_backend: "tensor"
+  enable_patch_drop: true
+  enable_drop_path: true
+  enable_perturbation_ema: true
+  enable_gaussian: true
+  enable_crop: true
+  enable_pad: true
+  enable_jpeg: true
+
+surrogates:
+  - model_name: "ViT-H-14"
+    pretrained: "laion2b_s32b_b79k"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-H-14"
+    pretrained: "metaclip_fullcc"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-H-14"
+    pretrained: "metaclip_altogether"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-H-14-378"
+    pretrained: "dfn5b"
+    input_size: 378
+    enabled: true
+  - model_name: "ViT-B-16-SigLIP"
+    pretrained: "webli"
+    input_size: 224
+    enabled: true
+  - model_name: "ViT-B-16-SigLIP-384"
+    pretrained: "webli"
+    input_size: 384
+    enabled: true
+  - model_name: "ViT-L-16-SigLIP-384"
+    pretrained: "webli"
+    input_size: 384
+    enabled: true
+  - model_name: "convnext_xxlarge"
+    pretrained: "laion2b_s34b_b82k_augreg"
+    input_size: 224
+    enabled: true
+
+evaluation:
+  success_margin_threshold: 0.0
+  gpt_victim:
+    enabled: false

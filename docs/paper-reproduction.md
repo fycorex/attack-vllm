@@ -9,6 +9,14 @@ settings, architecture, and GPT-4o/GPT-5-mini replay result, see:
 docs/current-reproduction.md
 ```
 
+## Surrogate Audit
+
+A surrogate audit is the checkpoint-name check needed before claiming
+paper-equivalent ASR. The current runnable configs use OpenCLIP checkpoints from
+the same broad families as the paper's CLIP surrogate ensemble, but a strict
+claim requires matching each configured `model_name:pretrained` pair against the
+paper appendix/table IDs and confirming the same preprocessing/input size.
+
 ## Captioning Dataset Manifest
 
 Prepare these local inputs first:
@@ -80,3 +88,108 @@ This config uses:
 - Audit the exact appendix surrogate checkpoint names against available
   OpenCLIP/Hugging Face checkpoints before claiming paper-equivalent ASR.
 - Run direct API replay separately for non-GPT-4o victim models.
+
+## LLaVA-Bench COCO VQA Demo
+
+The paper-grade VQA benchmark uses LLaVA-Bench COCO: 30 images, with
+Conversation, Detail, and Reasoning questions for each image. The small demo
+path uses the same benchmark source but limits the target image count to 5, so
+it creates 15 attack items. The full Hugging Face split is cached under
+`data/raw/hf_cache` before selecting the 5 demo images. For each target data
+entry, a different benchmark image is selected as the source image to perturb.
+
+```bash
+bash scripts/run_experiment.sh llava-vqa-demo 5 300
+bash scripts/run_experiment.sh eval-llava-vqa-gpt outputs/llava_vqa_eps16
+```
+
+Generated data:
+
+```text
+data/llava_bench_coco_vqa/manifest.json
+```
+
+Output:
+
+```text
+outputs/llava_vqa_eps16
+```
+
+The category-level replay summary is:
+
+```text
+outputs/llava_vqa_eps16/eval_summary.json
+```
+
+Latest checked demo result:
+
+| Victim | Overall | Conversation | Detail | Reasoning |
+| --- | ---: | ---: | ---: | ---: |
+| GPT-4o | 7 / 15 = 46.7% | 2 / 5 = 40% | 1 / 5 = 20% | 4 / 5 = 80% |
+| GPT-5-mini | 10 / 15 = 66.7% | 3 / 5 = 60% | 3 / 5 = 60% | 4 / 5 = 80% |
+
+The full paper-scale version should increase the target image count from 5 to
+30.
+
+## Text Recognition
+
+The receipt text-recognition path now uses
+`TrainingDataPro/ocr-receipts-text-detection`. The script caches the full
+Hugging Face dataset under `data/raw/hf_cache`, parses `annotations.xml`, and
+creates 40 targeted items from 20 receipt images. Each image contributes two
+questions that can be answered from explicit receipt text, and each question has
+an intentionally incorrect target answer.
+
+Prepare the manifest:
+
+```bash
+bash scripts/run_experiment.sh prepare-receipt-text 20 50
+```
+
+If the TrainingDataPro namespace is unavailable, use the mirrored owner:
+
+```bash
+RECEIPT_DATASET_REPO=UniqueData/ocr-receipts-text-detection \
+  bash scripts/run_experiment.sh prepare-receipt-text 20 50
+```
+
+Run `epsilon = 16/255`:
+
+```bash
+bash scripts/run_experiment.sh receipt-text-16 300 20
+bash scripts/run_experiment.sh eval-receipt-text-gpt outputs/receipt_text_eps16
+```
+
+Run `epsilon = 32/255`:
+
+```bash
+bash scripts/run_experiment.sh receipt-text-32 300 20
+bash scripts/run_experiment.sh eval-receipt-text-gpt outputs/receipt_text_eps32
+```
+
+Generated data:
+
+```text
+data/trainingdatapro_receipts_text/manifest.json
+```
+
+Outputs:
+
+```text
+outputs/receipt_text_eps16
+outputs/receipt_text_eps32
+```
+
+Latest checked eps32 result:
+
+| Victim | Overall | Store | Total | Item |
+| --- | ---: | ---: | ---: | ---: |
+| GPT-4o | 2 / 10 = 20% | 1 / 5 = 20% | 0 / 4 = 0% | 1 / 1 = 100% |
+| GPT-5-mini | 3 / 10 = 30% | 1 / 5 = 20% | 1 / 4 = 25% | 1 / 1 = 100% |
+
+This checked eps32 output contains 10 items from 5 receipt images. It is not the
+full 20-receipt, 40-question receipt-text setting.
+
+The preparation script supports a manual QA override CSV via
+`--qa_csv`. Use it when replacing the default annotation-derived store/total
+questions with hand-crafted paper-style questions.

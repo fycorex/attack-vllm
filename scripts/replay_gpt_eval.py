@@ -29,6 +29,7 @@ def build_item(metrics: dict) -> AttackItem:
         target_answer_keywords=metrics.get("target_answer_keywords") or metrics["target_keywords"],
         source_text_keywords=metrics.get("source_text_keywords") or metrics["source_keywords"],
         target_text_keywords=metrics.get("target_text_keywords") or metrics["target_keywords"],
+        metadata=metrics.get("metadata", {}),
     )
 
 
@@ -88,6 +89,14 @@ def main() -> None:
                         "metrics_path": str(metrics_path),
                         "source_label": item.source_label,
                         "target_label": item.target_label,
+                        "question_category": item.metadata.get("question_category"),
+                        "question_category_name": item.metadata.get("question_category_name"),
+                        "question_type": item.metadata.get("question_type"),
+                        "bbox_label": item.metadata.get("bbox_label"),
+                        "receipt_image_name": item.metadata.get("image_name"),
+                        "question": item.question,
+                        "source_answer_text": item.source_answer_text,
+                        "target_answer_text": item.target_answer_text,
                         "gpt_success": result.get("gpt_success"),
                         "clean_output": result.get("clean_output"),
                         "adversarial_output": result.get("adversarial_output"),

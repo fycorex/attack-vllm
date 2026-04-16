@@ -27,6 +27,7 @@ class AttackItem:
     target_answer_keywords: list[str] = field(default_factory=list)
     source_text_keywords: list[str] = field(default_factory=list)
     target_text_keywords: list[str] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -85,6 +86,7 @@ def load_manifest(path: str | Path) -> AttackManifest:
                     item["target_label"],
                     item.get("target_text_keywords") or item.get("target_keywords"),
                 ),
+                metadata=item.get("metadata", {}),
             )
         )
     return AttackManifest(

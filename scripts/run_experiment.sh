@@ -20,8 +20,18 @@ VENV="$PROJECT_ROOT/.venv"
 VENV_PYTHON="$VENV/bin/python"
 DEFAULT_ATTACK_CONFIG="configs/caption_attack_paper.yaml"
 DEFAULT_OUTPUT_DIR="outputs/paper_caltech"
+DEFAULT_LLAVA_VQA_CONFIG="configs/llava_bench_vqa_eps16.yaml"
+DEFAULT_LLAVA_VQA_OUTPUT_DIR="outputs/llava_vqa_eps16"
+DEFAULT_RECEIPT_TEXT_CONFIG_16="configs/receipt_text_eps16.yaml"
+DEFAULT_RECEIPT_TEXT_CONFIG_32="configs/receipt_text_eps32.yaml"
+DEFAULT_RECEIPT_TEXT_OUTPUT_16="outputs/receipt_text_eps16"
+DEFAULT_RECEIPT_TEXT_OUTPUT_32="outputs/receipt_text_eps32"
 DEFAULT_ITEMS=50
 DEFAULT_STEPS=300
+DEFAULT_LLAVA_VQA_IMAGES=5
+DEFAULT_LLAVA_VQA_STEPS=300
+DEFAULT_RECEIPT_IMAGES=20
+DEFAULT_RECEIPT_TEXT_STEPS=300
 
 # Colors
 RED='\033[0;31m'
@@ -310,6 +320,119 @@ evaluate_gpt_matrix() {
     log_info "GPT replay matrix complete"
 }
 
+evaluate_gpt_vqa_matrix() {
+    log_info "Evaluating replay matrix with TechUtopia LLaVA-Bench VQA models..."
+
+    source "$VENV/bin/activate"
+
+    OUTPUT_DIR=${1:-$DEFAULT_LLAVA_VQA_OUTPUT_DIR}
+    METRICS_GLOB=${2:-"$OUTPUT_DIR/item_*/metrics.json"}
+    export TECHUTOPIA_API_KEY="${TECHUTOPIA_API_KEY:-sk-test}"
+
+    mkdir -p "$OUTPUT_DIR"
+
+    local configs=(
+        "gpt4o:configs/techutopia_gpt4o_vqa_eval.yaml"
+        "gpt5mini:configs/techutopia_gpt5mini_vqa_eval.yaml"
+    )
+
+    log_info "Eval output: $OUTPUT_DIR"
+    log_info "Metrics glob: $METRICS_GLOB"
+
+    for entry in "${configs[@]}"; do
+        local name="${entry%%:*}"
+        local config="${entry#*:}"
+        local result_path="$OUTPUT_DIR/eval_${name}.jsonl"
+
+        log_info "Running $name VQA eval with $config"
+        python scripts/replay_gpt_eval.py \
+            --config "$config" \
+            --glob "$METRICS_GLOB" \
+            > "$result_path"
+        log_info "Saved $name results to $result_path"
+    done
+
+    python scripts/analyze_vqa_eval.py \
+        "$OUTPUT_DIR/eval_gpt4o.jsonl" \
+        "$OUTPUT_DIR/eval_gpt5mini.jsonl" \
+        --output "$OUTPUT_DIR/eval_summary.json"
+
+    log_info "LLaVA-Bench VQA GPT replay matrix complete"
+}
+
+evaluate_gpt_receipt_text_matrix() {
+    log_info "Evaluating replay matrix with TechUtopia receipt text models..."
+
+    source "$VENV/bin/activate"
+
+    OUTPUT_DIR=${1:-$DEFAULT_RECEIPT_TEXT_OUTPUT_16}
+    METRICS_GLOB=${2:-"$OUTPUT_DIR/item_*/metrics.json"}
+    export TECHUTOPIA_API_KEY="${TECHUTOPIA_API_KEY:-sk-test}"
+
+    mkdir -p "$OUTPUT_DIR"
+
+    local configs=(
+        "gpt4o:configs/techutopia_gpt4o_receipt_text_eval.yaml"
+        "gpt5mini:configs/techutopia_gpt5mini_receipt_text_eval.yaml"
+    )
+
+    log_info "Eval output: $OUTPUT_DIR"
+    log_info "Metrics glob: $METRICS_GLOB"
+
+    for entry in "${configs[@]}"; do
+        local name="${entry%%:*}"
+        local config="${entry#*:}"
+        local result_path="$OUTPUT_DIR/eval_${name}.jsonl"
+
+        log_info "Running $name receipt text eval with $config"
+        python scripts/replay_gpt_eval.py \
+            --config "$config" \
+            --glob "$METRICS_GLOB" \
+            > "$result_path"
+        log_info "Saved $name results to $result_path"
+    done
+
+    python scripts/analyze_receipt_text_eval.py \
+        "$OUTPUT_DIR/eval_gpt4o.jsonl" \
+        "$OUTPUT_DIR/eval_gpt5mini.jsonl" \
+        --output "$OUTPUT_DIR/eval_summary.json"
+
+    log_info "Receipt text GPT replay matrix complete"
+}
+
+prepare_llava_vqa_dataset() {
+    log_info "Preparing LLaVA-Bench COCO VQA demo dataset..."
+
+    source "$VENV/bin/activate"
+
+    local images=${1:-$DEFAULT_LLAVA_VQA_IMAGES}
+    local examples=${2:-50}
+    python scripts/prepare_llava_bench_coco_vqa.py \
+        --cache_dir data/raw/hf_cache \
+        --output_dir data/llava_bench_coco_vqa \
+        --num_images "$images" \
+        --num_examples "$examples"
+    log_info "LLaVA-Bench COCO VQA demo dataset ready"
+}
+
+prepare_receipt_text_dataset() {
+    log_info "Preparing TrainingDataPro receipt text dataset..."
+
+    source "$VENV/bin/activate"
+
+    local images=${1:-$DEFAULT_RECEIPT_IMAGES}
+    local examples=${2:-50}
+    local repo_id="${RECEIPT_DATASET_REPO:-TrainingDataPro/ocr-receipts-text-detection}"
+    python scripts/prepare_trainingdatapro_receipts_text.py \
+        --repo_id "$repo_id" \
+        --cache_dir data/raw/hf_cache \
+        --output_dir data/trainingdatapro_receipts_text \
+        --limit_images "$images" \
+        --questions_per_image 2 \
+        --num_examples "$examples"
+    log_info "TrainingDataPro receipt text dataset ready"
+}
+
 # =============================================================================
 # Step 6: Full Pipeline
 # =============================================================================
@@ -335,6 +458,57 @@ run_full_matrix() {
     log_info "50x300 attack plus GPT eval matrix complete"
 }
 
+run_llava_vqa_demo() {
+    local images=${1:-$DEFAULT_LLAVA_VQA_IMAGES}
+    local steps=${2:-$DEFAULT_LLAVA_VQA_STEPS}
+    local items=$((images * 3))
+
+    prepare_llava_vqa_dataset "$images" 50
+    run_attack "$DEFAULT_LLAVA_VQA_CONFIG" "$items" "$steps"
+
+    log_info "LLaVA-Bench VQA demo attack complete"
+    log_info "Run GPT replay with: bash scripts/run_experiment.sh eval-llava-vqa-gpt $DEFAULT_LLAVA_VQA_OUTPUT_DIR"
+}
+
+run_llava_vqa_demo_matrix() {
+    local images=${1:-$DEFAULT_LLAVA_VQA_IMAGES}
+    local steps=${2:-$DEFAULT_LLAVA_VQA_STEPS}
+
+    run_llava_vqa_demo "$images" "$steps"
+    evaluate_gpt_vqa_matrix "$DEFAULT_LLAVA_VQA_OUTPUT_DIR"
+}
+
+run_receipt_text_experiment() {
+    local epsilon=${1:-16}
+    local steps=${2:-$DEFAULT_RECEIPT_TEXT_STEPS}
+    local images=${3:-$DEFAULT_RECEIPT_IMAGES}
+    local items=$((images * 2))
+    local config="$DEFAULT_RECEIPT_TEXT_CONFIG_16"
+
+    if [ "$epsilon" = "32" ]; then
+        config="$DEFAULT_RECEIPT_TEXT_CONFIG_32"
+    fi
+
+    prepare_receipt_text_dataset "$images" 50
+    run_attack "$config" "$items" "$steps"
+
+    log_info "Receipt text epsilon=$epsilon attack complete"
+}
+
+run_receipt_text_matrix() {
+    local epsilon=${1:-16}
+    local steps=${2:-$DEFAULT_RECEIPT_TEXT_STEPS}
+    local images=${3:-$DEFAULT_RECEIPT_IMAGES}
+    local output="$DEFAULT_RECEIPT_TEXT_OUTPUT_16"
+
+    if [ "$epsilon" = "32" ]; then
+        output="$DEFAULT_RECEIPT_TEXT_OUTPUT_32"
+    fi
+
+    run_receipt_text_experiment "$epsilon" "$steps" "$images"
+    evaluate_gpt_receipt_text_matrix "$output"
+}
+
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -348,11 +522,41 @@ case "${1:-}" in
     dataset)
         prepare_dataset
         ;;
+    prepare-llava-vqa)
+        prepare_llava_vqa_dataset "${2:-}" "${3:-}"
+        ;;
+    prepare-receipt-text)
+        prepare_receipt_text_dataset "${2:-}" "${3:-}"
+        ;;
     attack)
         run_attack "${2:-}" "${3:-}" "${4:-}"
         ;;
     eval-gpt|evaluate-gpt|matrix)
         evaluate_gpt_matrix "${2:-}" "${3:-}"
+        ;;
+    eval-llava-vqa-gpt|eval-vqa-gpt)
+        evaluate_gpt_vqa_matrix "${2:-$DEFAULT_LLAVA_VQA_OUTPUT_DIR}" "${3:-}"
+        ;;
+    eval-receipt-text-gpt)
+        evaluate_gpt_receipt_text_matrix "${2:-$DEFAULT_RECEIPT_TEXT_OUTPUT_16}" "${3:-}"
+        ;;
+    llava-vqa-demo|vqa-demo)
+        run_llava_vqa_demo "${2:-}" "${3:-}"
+        ;;
+    llava-vqa-demo-matrix|vqa-demo-matrix)
+        run_llava_vqa_demo_matrix "${2:-}" "${3:-}"
+        ;;
+    receipt-text-16)
+        run_receipt_text_experiment 16 "${2:-}" "${3:-}"
+        ;;
+    receipt-text-32)
+        run_receipt_text_experiment 32 "${2:-}" "${3:-}"
+        ;;
+    receipt-text-16-matrix)
+        run_receipt_text_matrix 16 "${2:-}" "${3:-}"
+        ;;
+    receipt-text-32-matrix)
+        run_receipt_text_matrix 32 "${2:-}" "${3:-}"
         ;;
     full-matrix)
         shift
@@ -363,19 +567,33 @@ case "${1:-}" in
         run_full_experiment "$@"
         ;;
     *)
-        echo "Usage: $0 {setup|download|dataset|attack|eval-gpt|full-matrix|full}"
+        echo "Usage: $0 {setup|download|dataset|prepare-llava-vqa|prepare-receipt-text|attack|eval-gpt|eval-llava-vqa-gpt|eval-receipt-text-gpt|llava-vqa-demo|llava-vqa-demo-matrix|receipt-text-16|receipt-text-32|receipt-text-16-matrix|receipt-text-32-matrix|full-matrix|full}"
         echo ""
         echo "Commands:"
         echo "  setup           - Set up Python environment"
         echo "  download        - Download 8 CLIP models (paper Table 3)"
         echo "  dataset         - Prepare 50-item dataset"
+        echo "  prepare-llava-vqa [images] [examples] - Prepare LLaVA-Bench COCO VQA manifest"
+        echo "  prepare-receipt-text [images] [examples] - Prepare TrainingDataPro receipt text manifest"
         echo "  attack [cfg] [n] [s] - Run attack (config, items, steps)"
         echo "  eval-gpt [out] [glob] - Replay GPT-4o and GPT-5-mini eval matrix"
+        echo "  eval-llava-vqa-gpt [out] [glob] - Replay GPT VQA eval and summarize categories"
+        echo "  eval-receipt-text-gpt [out] [glob] - Replay GPT receipt text eval and summarize question types"
+        echo "  llava-vqa-demo [images] [steps] - Prepare and run 5-image LLaVA-Bench VQA attack"
+        echo "  llava-vqa-demo-matrix [images] [steps] - LLaVA-Bench VQA attack plus GPT eval"
+        echo "  receipt-text-16 [steps] [images] - Receipt text attack with epsilon=16/255"
+        echo "  receipt-text-32 [steps] [images] - Receipt text attack with epsilon=32/255"
+        echo "  receipt-text-16-matrix [steps] [images] - Receipt text epsilon=16/255 plus GPT eval"
+        echo "  receipt-text-32-matrix [steps] [images] - Receipt text epsilon=32/255 plus GPT eval"
         echo "  full-matrix [cfg] [n] [s] [out] - Run 50x300 attack plus GPT eval matrix"
         echo "  full            - Run setup, downloads, attack, and GPT eval matrix"
         echo ""
         echo "Examples:"
         echo "  $0 full-matrix                             # 50 items x 300 steps + GPT eval matrix"
+        echo "  $0 llava-vqa-demo 5 300"
+        echo "  $0 eval-llava-vqa-gpt outputs/llava_vqa_eps16"
+        echo "  $0 receipt-text-16 300 20"
+        echo "  $0 receipt-text-32 300 20"
         echo "  $0 attack configs/caption_attack_paper.yaml 50 300"
         echo "  $0 eval-gpt outputs/paper_caltech"
         exit 1
