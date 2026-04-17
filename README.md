@@ -1,9 +1,11 @@
 # Adversarial Attack on VLLMs - Practice Reproduction
 
 Practice reproduction of the transferable VLLM attack in arXiv:2505.01050v1.
-The repo contains runnable caption, VQA, and receipt text-recognition demo
-pipelines plus a stricter NIPS 2017/ImageNet manifest path for paper-grade
-caption experiments.
+The current runnable configs use available surrogate checkpoints from related
+model families. They are suitable for engineering validation and smoke/demo
+reproduction, but they are not yet an appendix-exact match to the paper’s
+surrogate set. Final paper-equivalent claims require checkpoint-by-checkpoint
+audit against Table 12.
 
 Paper: https://arxiv.org/html/2505.01050v1
 
@@ -353,8 +355,9 @@ jpeg_prob: 0.2
 jpeg_backend: tensor
 ```
 
-The strict paper caption path differs here: it keeps the benchmark's original
-229 x 299 image size instead of this engineering square resize.
+The engineering caption path currently uses a square resize (`image_size: 299`).
+In the paper, the main captioning results are reported at input size 299, while
+several captioning ablations are reported at input size 229.
 
 Optional 8/255 epsilon experiment command:
 
