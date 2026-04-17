@@ -219,11 +219,7 @@ docs/results/llava_vqa_eps16_demo/
 This is an engineering receipt-text demo path built on
 `TrainingDataPro/ocr-receipts-text-detection`. It is useful for validating the
 crop-and-replace OCR attack pipeline, but it is not the paper's strict text
-recognition benchmark. The paper uses Omni-OCR with 200 filtered test cases and
-keeps the original image size. The strict paper-oriented setup is documented in
-`configs/omni_ocr_text_paper_eps16.yaml`,
-`configs/omni_ocr_text_paper_eps32.yaml`, and
-`docs/paper-reproduction.md`.
+recognition benchmark. The paper also uses PaddleOCR.
 
 The current demo prep script caches the full Hugging Face dataset under
 `data/raw/hf_cache`, reads `annotations.xml`, and builds 40 targeted items from
