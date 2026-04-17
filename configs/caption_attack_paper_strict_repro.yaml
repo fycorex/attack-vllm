@@ -26,8 +26,10 @@ runtime:
   cudnn_benchmark: true
 
 attack:
-  # Paper Table 2 captioning setting reports input size 299.
-  image_size: 299
+  # The paper's default protocol keeps the attack image at the original caption
+  # benchmark resolution. For NIPS 2017 dev images in this benchmark, that is
+  # 229 x 299. The square 299 setting appears only in the input-size ablation.
+  image_size: [229, 299]
   epsilon: 0.0627
   step_size: 0.004
   steps: 300

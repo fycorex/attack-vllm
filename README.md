@@ -159,6 +159,11 @@ This is the small paper-style VQA benchmark path. It downloads
 Conversation, Detail, and Reasoning for each target image. For each item, a
 different benchmark image is selected as the source image to perturb.
 
+The strict paper-scale VQA setup is 30 target images / 90 attack items and keeps
+the original image size. In this repo, that target setup is documented in
+`configs/llava_bench_vqa_paper_strict_repro.yaml`; the commands below remain the
+small demo path.
+
 Run the 5-image, 15-item VQA attack with `epsilon = 16/255`:
 
 ```bash
@@ -211,12 +216,20 @@ docs/results/llava_vqa_eps16_demo/
 
 ## Receipt Text-Recognition
 
-This path targets the paper's retail receipt setting with
-`TrainingDataPro/ocr-receipts-text-detection`. The prep script caches the full
-Hugging Face dataset under `data/raw/hf_cache`, reads `annotations.xml`, and
-builds 40 targeted items from 20 receipt images: two explicit-text questions per
-receipt. Each target answer is intentionally incorrect, and positive examples
-render that incorrect answer into the annotated receipt region.
+This is an engineering receipt-text demo path built on
+`TrainingDataPro/ocr-receipts-text-detection`. It is useful for validating the
+crop-and-replace OCR attack pipeline, but it is not the paper's strict text
+recognition benchmark. The paper uses Omni-OCR with 200 filtered test cases and
+keeps the original image size. The strict paper-oriented setup is documented in
+`configs/omni_ocr_text_paper_eps16.yaml`,
+`configs/omni_ocr_text_paper_eps32.yaml`, and
+`docs/paper-reproduction.md`.
+
+The current demo prep script caches the full Hugging Face dataset under
+`data/raw/hf_cache`, reads `annotations.xml`, and builds 40 targeted items from
+20 receipt images: two explicit-text questions per receipt. Each target answer
+is intentionally incorrect, and positive examples render that incorrect answer
+into the annotated receipt region.
 
 Prepare the manifest:
 
@@ -343,6 +356,9 @@ top_k: 10
 jpeg_prob: 0.2
 jpeg_backend: tensor
 ```
+
+The strict paper caption path differs here: it keeps the benchmark's original
+229 x 299 image size instead of this engineering square resize.
 
 Optional 8/255 epsilon experiment command:
 

@@ -12,7 +12,7 @@ from tqdm import tqdm
 from augmentations import AttackAugmentationPipeline
 from caption_victim import CaptionVictim
 from config import AttackConfig, config_to_dict, enabled_surrogate_names, load_config
-from data import AttackItem, load_image_tensor, load_manifest, save_tensor_image, tensor_to_pil_image
+from data import AttackItem, load_image_tensor, load_manifest, normalize_image_size, save_tensor_image, tensor_to_pil_image
 from eval import evaluate_proxy, summarize_results, write_item_csv
 from losses import relative_proxy_loss, visual_contrastive_loss
 from ocr_victim import OCRVictim
@@ -119,9 +119,10 @@ class CaptionAttackRunner:
             return images
         return F.interpolate(images, size=(input_size, input_size), mode="bilinear", align_corners=False, antialias=True)
 
-    def _base_attack_size(self) -> int:
+    def _base_attack_size(self) -> int | str | list[int] | tuple[int, int]:
         if self.config.attack.image_size is not None:
-            return int(self.config.attack.image_size)
+            size = normalize_image_size(self.config.attack.image_size)
+            return self.config.attack.image_size if size is None else size
         for spec in self.config.surrogates:
             if spec.enabled:
                 return int(spec.input_size)

@@ -114,6 +114,10 @@ jpeg_prob: 0.2
 jpeg_backend: tensor
 ```
 
+This is an engineering convenience resize for the Caltech demo. The strict
+paper caption benchmark keeps the original 229 x 299 image size instead; see
+`configs/caption_attack_paper_strict_repro.yaml`.
+
 Lower-budget 8/255 epsilon option:
 
 ```bash

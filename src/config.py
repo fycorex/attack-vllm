@@ -25,7 +25,7 @@ class AttackHyperParams:
     epsilon: float = 16.0 / 255.0
     step_size: float = 1.0 / 255.0
     steps: int = 20
-    image_size: int | None = None
+    image_size: int | str | list[int] | tuple[int, int] | None = None
     augmentation_batches: int = 1
     augmentation_forward_batch_size: int = 1
     metrics_interval: int = 1

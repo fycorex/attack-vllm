@@ -96,10 +96,31 @@ def load_manifest(path: str | Path) -> AttackManifest:
     )
 
 
-def load_image_tensor(path: str | Path, image_size: int) -> torch.Tensor:
+def normalize_image_size(image_size: int | str | list[int] | tuple[int, int] | None) -> tuple[int, int] | None:
+    if image_size is None:
+        return None
+    if isinstance(image_size, str):
+        normalized = image_size.strip().lower()
+        if normalized in {"original", "native", "keep"}:
+            return None
+        raise ValueError(f"Unsupported image_size string: {image_size!r}")
+    if isinstance(image_size, int):
+        return (image_size, image_size)
+    if isinstance(image_size, (list, tuple)) and len(image_size) == 2:
+        height, width = int(image_size[0]), int(image_size[1])
+        if height <= 0 or width <= 0:
+            raise ValueError(f"image_size values must be positive, got {image_size!r}")
+        return (height, width)
+    raise ValueError(f"Unsupported image_size value: {image_size!r}")
+
+
+def load_image_tensor(path: str | Path, image_size: int | str | list[int] | tuple[int, int] | None) -> torch.Tensor:
     image = Image.open(path).convert("RGB")
     tensor = TF.to_tensor(image)
-    return TF.resize(tensor, [image_size, image_size], antialias=True)
+    resize_to = normalize_image_size(image_size)
+    if resize_to is None:
+        return tensor
+    return TF.resize(tensor, list(resize_to), antialias=True)
 
 
 def tensor_to_pil_image(tensor: torch.Tensor) -> Image.Image:

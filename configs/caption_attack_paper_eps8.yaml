@@ -1,6 +1,6 @@
-# Paper-aligned config: arXiv:2505.01050v1
-# 8 CLIP models as per paper Table 3 (achieves 94.4% on GPT-4o)
-# Default: ViT-SigLIP (3) + ViT-H (4) + ConvNeXt (1) per paper Section 3.2
+# Engineering caption demo config inspired by arXiv:2505.01050v1.
+# This file is not the strict paper benchmark: it uses the local Caltech demo
+# manifest and a square 299 attack canvas for convenience.
 experiment_name: "paper-full-eps8"
 
 paths:
@@ -17,7 +17,8 @@ runtime:
   cudnn_benchmark: true
 
 attack:
-  # Lower-budget engineering option: epsilon=8/255 ≈ 0.03137.
+  # Lower-budget engineering option. The strict paper caption benchmark keeps
+  # the original 229 x 299 image size instead of this square resize.
   image_size: 299
   epsilon: 0.0313725
   step_size: 0.004
