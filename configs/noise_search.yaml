@@ -1,0 +1,82 @@
+version: 1
+selection_metric: heldout_macro_asr
+
+datasets:
+  caption_caltech:
+    attack_config: configs/caption_attack_paper_eps8.yaml
+    manifest: data/caltech_large/manifest.json
+    task: caption
+  llava_vqa:
+    attack_config: configs/llava_bench_vqa_eps16.yaml
+    manifest: data/llava_bench_coco_vqa/manifest.json
+    task: vqa
+  receipt_ocr:
+    attack_config: configs/receipt_text_eps16.yaml
+    manifest: data/trainingdatapro_receipts_text/manifest.json
+    task: receipt_ocr
+
+surrogate_groups:
+  vit_resnet_diverse:
+    rationale: ViT plus ResNet attack surrogates; held-out checkpoint and architecture are disjoint.
+    sequential: false
+    attack:
+      - {model_name: ViT-B-32, pretrained: laion2b_s34b_b79k, input_size: 224}
+      - {model_name: RN50, pretrained: openai, input_size: 224}
+    heldout:
+      - {model_name: ViT-B-16, pretrained: openai, input_size: 224}
+      - {model_name: RN101, pretrained: openai, input_size: 224}
+  vit_pretraining_diverse:
+    rationale: Two ViT-B checkpoints with different patch sizes/training families; held-out OpenAI ViT-L.
+    sequential: false
+    attack:
+      - {model_name: ViT-B-32, pretrained: laion2b_s34b_b79k, input_size: 224}
+      - {model_name: ViT-B-16, pretrained: laion2b_s34b_b88k, input_size: 224}
+    heldout:
+      - {model_name: ViT-L-14, pretrained: openai, input_size: 224}
+
+stages:
+  stage0:
+    datasets: [caption_caltech]
+    surrogate_groups: [vit_resnet_diverse]
+    items: 4
+    steps: 20
+    seeds: [42]
+    noise:
+      modes: [none, paper_gaussian_single_sample, gaussian_eot, uniform_eot, rademacher_eot, antithetic_gaussian_eot]
+      sigmas: [0.0, 0.0078431373, 0.0156862745]
+      samples: [1, 2]
+  stage1:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    surrogate_groups: [vit_resnet_diverse, vit_pretraining_diverse]
+    items: 20
+    steps: 100
+    seeds: [42, 123, 2026]
+    noise:
+      modes: [none, paper_gaussian_single_sample, gaussian_eot, uniform_eot, rademacher_eot, antithetic_gaussian_eot]
+      sigmas: [0.0, 0.0039215686, 0.0078431373, 0.0156862745]
+      samples: [1, 2, 4]
+  equal_forward:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    surrogate_groups: [vit_resnet_diverse, vit_pretraining_diverse]
+    items: 20
+    steps: 100
+    seeds: [42, 123, 2026]
+    noise: {modes: [], sigmas: [], samples: []}
+    # Four-sample EOT at 100 steps is compared with no-noise at 400 steps.
+    explicit_conditions:
+      - {mode: none, sigma: 0.0, samples: 1, steps: 400, budget_label: 400_forward_units}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 4, steps: 100, budget_label: 400_forward_units}
+      - {mode: uniform_eot, sigma: 0.0078431373, samples: 4, steps: 100, budget_label: 400_forward_units}
+      - {mode: rademacher_eot, sigma: 0.0078431373, samples: 4, steps: 100, budget_label: 400_forward_units}
+      - {mode: antithetic_gaussian_eot, sigma: 0.0078431373, samples: 4, steps: 100, budget_label: 400_forward_units}
+  final:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    surrogate_groups: [vit_resnet_diverse, vit_pretraining_diverse]
+    items: 50
+    steps: 300
+    seeds: [42, 123, 2026]
+    noise:
+      # Replace candidates with stage1 winners before running final.
+      modes: [none, gaussian_eot, antithetic_gaussian_eot]
+      sigmas: [0.0, 0.0078431373]
+      samples: [1, 4]
