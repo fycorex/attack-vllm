@@ -1,0 +1,19 @@
+experiment_name: frozen-noise-techutopia-vqa-confirmation
+task_type: vqa
+question_fallback: What is the main object in the image?
+require_source_absent: true
+models:
+  - provider: openai
+    model_id: gpt-4o
+    base_url: https://copilot.techutopia.cn/v1
+    api_key_env: TECHUTOPIA_API_KEY
+    max_output_tokens: 64
+    max_retries: 3
+    requests_per_minute: 30
+  - provider: openai
+    model_id: gpt-5-mini
+    base_url: https://copilot.techutopia.cn/v1
+    api_key_env: TECHUTOPIA_API_KEY
+    max_output_tokens: 64
+    max_retries: 3
+    requests_per_minute: 30
