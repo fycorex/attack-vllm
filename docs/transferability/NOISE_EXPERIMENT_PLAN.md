@@ -39,15 +39,15 @@ PYTHONPATH=src .venv/bin/python scripts/run_noise_search.py \
   --spec configs/noise_search.yaml --stage stage0 --plan
 ```
 
-Run the complete resumable search and validation loop with four concurrent
-trials on the A6000:
+Run the complete resumable search and validation loop with eight concurrent
+trials on the 48 GB A6000 (use four if the host is CPU constrained):
 
 ```bash
 PYTHONPATH=src .venv/bin/python scripts/run_adaptive_noise_search.py \
   --spec configs/noise_search.yaml \
   --root outputs/noise_search \
   --until final \
-  --workers 4
+  --workers 8
 ```
 
 To stop after open-source selection, use `--until stage1`. Re-running the same
