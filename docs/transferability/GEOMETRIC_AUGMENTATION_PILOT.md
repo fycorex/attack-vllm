@@ -23,7 +23,8 @@ Stage 0 uses four Caltech caption items, 20 steps, one seed, and no API. It must
 pass determinism, output completeness, finite-value, L-infinity, held-out
 disjointness, and exact-forward checks before a larger pilot.
 
-The equal-step pilot uses 100 optimization steps. The equal-forward pilot
+Both cross-dataset pilots use 19 unique source images per dataset. The
+equal-step pilot uses 100 optimization steps. The equal-forward pilot
 compares 400 one-sample baseline updates with 100 four-sample EOT updates. With
 two attack surrogates and the inherited four augmentation batches, every
 equal-forward condition uses exactly 3,200 surrogate forwards per item.
