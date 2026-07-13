@@ -144,6 +144,31 @@ Replay GPT-4o and GPT-5-mini on existing attack outputs only:
 bash scripts/run_experiment.sh eval-gpt outputs/paper_caltech
 ```
 
+Provider-neutral replay is available for OpenAI, Gemini, and Anthropic. It is
+safe by default: without `--allow-real-api` it only estimates work.
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/replay_multimodel_eval.py \
+  --config configs/transferability_primary.yaml \
+  --output-dir outputs/paper_caltech \
+  --result-dir api_eval_outputs/primary \
+  --dry-run
+```
+
+After reviewing the estimate and exporting the configured provider keys, the
+corresponding explicit real run is:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/replay_multimodel_eval.py \
+  --config configs/transferability_primary.yaml \
+  --output-dir outputs/paper_caltech \
+  --result-dir api_eval_outputs/primary \
+  --allow-real-api --resume --max-requests 300
+```
+
+For 50 items, three models, and clean/adversarial images, the estimate is 300
+requests. API replay is separate from attack optimization.
+
 Run only GPT-5-mini on existing outputs:
 
 ```bash

@@ -1,0 +1,25 @@
+experiment_name: techutopia-frozen-api-replay
+task_type: caption
+caption_prompt: Provide a concise description of the image using no more than three sentences.
+models:
+  # The floating gpt-4o alias rejected standard image payloads on 2026-07-13;
+  # this advertised dated route passed the same capability smoke.
+  - provider: openai
+    model_id: gpt-4o-2024-05-13
+    api_key_env: TECHUTOPIA_API_KEY
+    base_url: https://copilot.techutopia.cn/v1
+    image_format: png
+    image_detail: low
+    browser_headers: true
+    max_output_tokens: 64
+  # Advertised by /models but currently returns model_not_supported. Keep it
+  # recorded here without allowing it into a real replay matrix.
+  - provider: openai
+    model_id: gpt-5-mini
+    enabled: false
+    api_key_env: TECHUTOPIA_API_KEY
+    base_url: https://copilot.techutopia.cn/v1
+    image_format: png
+    image_detail: low
+    browser_headers: true
+    max_output_tokens: 64

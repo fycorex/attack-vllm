@@ -1,0 +1,21 @@
+experiment_name: techutopia-frozen-vqa-replay
+task_type: vqa
+question_fallback: What is shown in the image? Answer concisely.
+models:
+  - provider: openai
+    model_id: gpt-4o-2024-05-13
+    api_key_env: TECHUTOPIA_API_KEY
+    base_url: https://copilot.techutopia.cn/v1
+    image_format: png
+    image_detail: low
+    browser_headers: true
+    max_output_tokens: 64
+  - provider: openai
+    model_id: gpt-5-mini
+    enabled: false
+    api_key_env: TECHUTOPIA_API_KEY
+    base_url: https://copilot.techutopia.cn/v1
+    image_format: png
+    image_detail: low
+    browser_headers: true
+    max_output_tokens: 64

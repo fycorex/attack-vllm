@@ -1,0 +1,22 @@
+experiment_name: techutopia-vision-capability-smoke
+task_type: caption
+caption_prompt: Provide a concise description of the image using no more than three sentences.
+models:
+  - provider: openai
+    model_id: gpt-4o
+    api_key_env: TECHUTOPIA_API_KEY
+    base_url: https://copilot.techutopia.cn/v1
+    image_format: jpeg
+    jpeg_quality: 95
+    image_detail: low
+    browser_headers: true
+    max_output_tokens: 64
+  - provider: openai
+    model_id: gpt-5-mini
+    api_key_env: TECHUTOPIA_API_KEY
+    base_url: https://copilot.techutopia.cn/v1
+    image_format: jpeg
+    jpeg_quality: 95
+    image_detail: low
+    browser_headers: true
+    max_output_tokens: 64
