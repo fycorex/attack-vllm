@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -372,6 +373,14 @@ def build_auto_qa(
     return rows
 
 
+def select_qa_rows(qa_rows: list[dict[str, str]], questions_per_image: int, image_index: int) -> list[dict[str, str]]:
+    if questions_per_image == 1 and qa_rows:
+        preferred = PREFERRED_LABELS[image_index % len(PREFERRED_LABELS)]
+        matching = [row for row in qa_rows if normalize_label(row.get("bbox_label") or row.get("question_type") or "") == preferred]
+        return (matching or qa_rows)[:1]
+    return qa_rows[:questions_per_image]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Prepare the TrainingDataPro receipt text-recognition attack manifest."
@@ -417,10 +426,20 @@ def main() -> None:
         raise SystemExit("No annotated receipt images could be matched to downloaded images.")
 
     items: list[dict[str, Any]] = []
-    for image_index, image_name in enumerate(image_names[: args.limit_images]):
+    seen_image_hashes: set[str] = set()
+    accepted_images = 0
+    for image_name in image_names:
+        if accepted_images >= args.limit_images:
+            break
         image_bytes = images.get(image_name) or images.get(Path(image_name).name)
         if image_bytes is None:
             continue
+        image_hash = hashlib.sha256(image_bytes).hexdigest()
+        if image_hash in seen_image_hashes:
+            continue
+        seen_image_hashes.add(image_hash)
+        image_index = accepted_images
+        accepted_images += 1
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         clean_path = source_dir / f"receipt_{image_index:02d}{Path(image_name).suffix or '.png'}"
         clean_path.parent.mkdir(parents=True, exist_ok=True)
@@ -430,7 +449,7 @@ def main() -> None:
         qa_rows = manual_qa.get(image_name) or manual_qa.get(Path(image_name).name)
         if not qa_rows:
             qa_rows = build_auto_qa(image_name, shapes, rng, all_answers_by_label)
-        qa_rows = qa_rows[: args.questions_per_image]
+        qa_rows = select_qa_rows(qa_rows, args.questions_per_image, image_index)
 
         for question_index, qa in enumerate(qa_rows):
             label = normalize_label(qa.get("bbox_label") or qa.get("question_type") or "")
@@ -491,6 +510,7 @@ def main() -> None:
                         "dataset": "TrainingDataPro/ocr-receipts-text-detection",
                         "raw_source": raw_source,
                         "image_name": image_name,
+                        "source_image_sha256": image_hash,
                         "question_type": question_type,
                         "bbox_label": label,
                         "bbox": list(shape["bbox"]),

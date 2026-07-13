@@ -17,16 +17,58 @@ class AttackAugmentationPipeline:
         self.config = config
         self.image_size = image_size
 
-    def __call__(self, images: torch.Tensor, epsilon: float) -> torch.Tensor:
+    def __call__(self, images: torch.Tensor, epsilon: float, *, noise: torch.Tensor | None = None,
+                 generator: torch.Generator | None = None) -> torch.Tensor:
         x = images
-        if self.config.enable_gaussian and random.random() < self.config.gaussian_prob:
+        mode = self.config.noise_mode
+        if noise is not None:
+            x = (x + noise).clamp(0.0, 1.0)
+        elif mode in {"legacy", "paper_gaussian_single_sample"} and self.config.enable_gaussian and random.random() < self.config.gaussian_prob:
             x = self.apply_gaussian_noise(x, epsilon)
-        if self.config.enable_crop and random.random() < self.config.crop_prob:
-            x = self.apply_crop(x)
-        x = self.apply_pad_and_resize(x)
+        if self.config.geometry_mode not in {"legacy", "none"}:
+            x = self.apply_explicit_geometry(x, self.config.geometry_mode, generator=generator)
+        else:
+            if self.config.geometry_mode == "legacy" and self.config.enable_crop and random.random() < self.config.crop_prob:
+                x = self.apply_crop(x)
+            x = self.apply_pad_and_resize(x)
         if self.config.enable_jpeg and random.random() < self.config.jpeg_prob:
             x = self.apply_diff_jpeg(x)
         return x.clamp(0.0, 1.0)
+
+    @staticmethod
+    def _uniform(low: float, high: float, generator: torch.Generator | None, device: torch.device) -> float:
+        return float((torch.rand((), generator=generator, device=device) * (high - low) + low).item())
+
+    def apply_explicit_geometry(self, images: torch.Tensor, mode: str,
+                                *, generator: torch.Generator | None = None) -> torch.Tensor:
+        if mode == "geometric_mixture":
+            choices = ("translation", "resize_pad", "scale")
+            index = int(torch.randint(0, len(choices), (), generator=generator, device=images.device).item())
+            mode = choices[index]
+        outputs = []
+        for image in images:
+            _, height, width = image.shape
+            if mode == "translation":
+                max_y = int(round(height * self.config.translation_fraction))
+                max_x = int(round(width * self.config.translation_fraction))
+                dy = int(torch.randint(-max_y, max_y + 1, (), generator=generator, device=image.device).item()) if max_y else 0
+                dx = int(torch.randint(-max_x, max_x + 1, (), generator=generator, device=image.device).item()) if max_x else 0
+                padded = F.pad(image, (max_x, max_x, max_y, max_y), mode="reflect")
+                image = padded[:, max_y - dy:max_y - dy + height, max_x - dx:max_x - dx + width]
+            elif mode in {"resize_pad", "scale"}:
+                scale = self._uniform(self.config.geometry_scale_min, self.config.geometry_scale_max, generator, image.device)
+                small_h, small_w = max(1, int(round(height * scale))), max(1, int(round(width * scale)))
+                small = F.interpolate(image.unsqueeze(0), size=(small_h, small_w), mode="bilinear", align_corners=False, antialias=True)[0]
+                if mode == "resize_pad":
+                    top = int(torch.randint(0, height - small_h + 1, (), generator=generator, device=image.device).item())
+                    left = int(torch.randint(0, width - small_w + 1, (), generator=generator, device=image.device).item())
+                    image = F.pad(small, (left, width - small_w - left, top, height - small_h - top), mode="constant", value=0.0)
+                else:
+                    image = F.interpolate(small.unsqueeze(0), size=(height, width), mode="bilinear", align_corners=False, antialias=True)[0]
+            else:
+                raise ValueError(f"Unsupported explicit geometry mode: {mode!r}")
+            outputs.append(TF.resize(image, [self.image_size, self.image_size], antialias=True))
+        return torch.stack(outputs)
 
     def apply_gaussian_noise(self, images: torch.Tensor, epsilon: float) -> torch.Tensor:
         sigma = epsilon * self.config.gaussian_scale_multiplier
@@ -112,3 +154,29 @@ class AttackAugmentationPipeline:
             jpeg_images.append(TF.to_tensor(jpeg_pil))
         jpeg_tensor = torch.stack(jpeg_images, dim=0).to(images.device)
         return images + (jpeg_tensor - images).detach()
+
+
+def effective_sigma(config: AttackHyperParams, epsilon: float, progress: float = 0.0) -> float:
+    sigma = float(config.noise_sigma) if config.noise_sigma is not None else epsilon * config.gaussian_scale_multiplier
+    progress = max(0.0, min(1.0, progress))
+    if config.noise_schedule == "linear_decay":
+        sigma *= 1.0 - progress
+    elif config.noise_schedule == "cosine_decay":
+        sigma *= 0.5 * (1.0 + torch.cos(torch.tensor(progress * torch.pi)).item())
+    return sigma
+
+
+def sample_noise(mode: str, reference: torch.Tensor, sigma: float, *, generator: torch.Generator | None = None,
+                 antithetic_base: torch.Tensor | None = None, antithetic_sign: int = 1) -> torch.Tensor:
+    if mode in {"none", "legacy", "paper_gaussian_single_sample"} or sigma == 0:
+        return torch.zeros_like(reference)
+    if mode in {"gaussian_eot", "antithetic_gaussian_eot"}:
+        base = antithetic_base if antithetic_base is not None else torch.randn(reference.shape, device=reference.device, dtype=reference.dtype, generator=generator)
+        return base * sigma * antithetic_sign
+    if mode == "uniform_eot":
+        bound = (3.0 ** 0.5) * sigma
+        return torch.empty_like(reference).uniform_(-bound, bound, generator=generator)
+    if mode == "rademacher_eot":
+        values = torch.randint(0, 2, reference.shape, device=reference.device, generator=generator)
+        return (values.to(reference.dtype) * 2.0 - 1.0) * sigma
+    raise ValueError(f"Unsupported explicit noise mode: {mode!r}")

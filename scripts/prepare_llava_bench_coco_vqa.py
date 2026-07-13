@@ -123,6 +123,14 @@ def main() -> None:
     parser.add_argument("--num_images", type=int, default=5)
     parser.add_argument("--num_examples", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--allow_repeated_source_images", action="store_true",
+        help="Use independent random source selection. The default assigns unique source images to avoid pseudo-replication.",
+    )
+    parser.add_argument(
+        "--one_question_per_image", action="store_true",
+        help="Emit one cyclically balanced question category per source image for independent-image pilots.",
+    )
     args = parser.parse_args()
 
     load_dataset = require_datasets()
@@ -132,6 +140,14 @@ def main() -> None:
     grouped = group_rows(rows)
     target_image_ids = select_target_image_ids(grouped, args.num_images, rng)
     all_image_ids = sorted(grouped)
+    if args.allow_repeated_source_images:
+        source_image_ids = [rng.choice([value for value in all_image_ids if value != target]) for target in target_image_ids]
+    elif len(target_image_ids) > 1:
+        # A cyclic derangement provides exactly one distinct source image per
+        # target without blind random collisions.
+        source_image_ids = target_image_ids[1:] + target_image_ids[:1]
+    else:
+        source_image_ids = [rng.choice([value for value in all_image_ids if value != target_image_ids[0]])]
 
     output_dir = Path(args.output_dir)
     source_dir = output_dir / "source_images"
@@ -140,15 +156,14 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     items: list[dict[str, Any]] = []
-    for target_index, target_image_id in enumerate(target_image_ids):
-        source_candidates = [image_id for image_id in all_image_ids if image_id != target_image_id]
-        source_image_id = rng.choice(source_candidates)
+    for target_index, (target_image_id, source_image_id) in enumerate(zip(target_image_ids, source_image_ids)):
         source_row = grouped[source_image_id]["detail"]
         source_image = image_to_rgb(source_row["image"])
         source_caption = normalize_text(source_row.get("caption") or source_row.get("answer") or source_image_id)
         source_path = save_image_once(source_image, source_dir / source_row["image_id"],)
 
-        for category in CATEGORIES:
+        categories = (CATEGORIES[target_index % len(CATEGORIES)],) if args.one_question_per_image else CATEGORIES
+        for category in categories:
             target_row = grouped[target_image_id][category]
             target_image = image_to_rgb(target_row["image"])
             target_caption = normalize_text(target_row.get("caption") or target_row.get("answer") or target_image_id)
@@ -215,8 +230,11 @@ def main() -> None:
             "num_target_images": len(target_image_ids),
             "num_items": len(items),
             "categories": list(CATEGORIES),
+            "one_question_per_image": args.one_question_per_image,
             "num_examples_per_item": args.num_examples,
             "seed": args.seed,
+            "unique_source_images": not args.allow_repeated_source_images,
+            "num_unique_source_images": len(set(source_image_ids)),
             "protocol": (
                 "Each target data entry provides the question and ground-truth answer. "
                 "A different benchmark image is selected as the source image to perturb. "

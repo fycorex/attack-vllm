@@ -37,6 +37,19 @@ class AttackHyperParams:
     perturbation_ema_decay: float = 0.99
     gaussian_prob: float = 0.5
     gaussian_scale_multiplier: float = 0.25
+    # Explicit noise study controls. "legacy" preserves the pre-existing
+    # probabilistic Gaussian augmentation byte-for-byte.
+    noise_mode: str = "legacy"
+    noise_sigma: float | None = None
+    noise_samples: int = 1
+    noise_schedule: str = "constant"
+    # Explicit geometric EOT controls. "legacy" preserves the repository's
+    # probabilistic crop/pad path; "none" disables explicit geometry.
+    geometry_mode: str = "legacy"
+    geometry_samples: int = 1
+    translation_fraction: float = 0.08
+    geometry_scale_min: float = 0.80
+    geometry_scale_max: float = 1.00
     crop_prob: float = 0.5
     crop_scale_min: float = 0.80
     crop_scale_max: float = 1.00
@@ -54,6 +67,29 @@ class AttackHyperParams:
     enable_crop: bool = True
     enable_pad: bool = True
     enable_jpeg: bool = True
+
+    def validate_noise(self) -> None:
+        allowed = {
+            "legacy", "none", "paper_gaussian_single_sample", "gaussian_eot",
+            "uniform_eot", "rademacher_eot", "antithetic_gaussian_eot",
+        }
+        if self.noise_mode not in allowed:
+            raise ValueError(f"Unsupported noise_mode: {self.noise_mode!r}")
+        if self.noise_samples < 1:
+            raise ValueError("noise_samples must be at least 1")
+        if self.noise_mode == "antithetic_gaussian_eot" and self.noise_samples % 2:
+            raise ValueError("antithetic Gaussian requires an even noise_samples value")
+        if self.noise_schedule not in {"constant", "linear_decay", "cosine_decay"}:
+            raise ValueError(f"Unsupported noise_schedule: {self.noise_schedule!r}")
+        geometry_modes = {"legacy", "none", "translation", "resize_pad", "scale", "geometric_mixture"}
+        if self.geometry_mode not in geometry_modes:
+            raise ValueError(f"Unsupported geometry_mode: {self.geometry_mode!r}")
+        if self.geometry_samples < 1:
+            raise ValueError("geometry_samples must be at least 1")
+        if not 0 <= self.translation_fraction <= 0.5:
+            raise ValueError("translation_fraction must be between 0 and 0.5")
+        if not 0 < self.geometry_scale_min <= self.geometry_scale_max <= 1:
+            raise ValueError("geometry scale range must satisfy 0 < min <= max <= 1")
 
 
 @dataclass
@@ -324,4 +360,5 @@ def load_config(path: str | Path) -> AttackConfig:
             SurrogateConfig(model_name="ViT-B-16", pretrained="laion2b_s34b_b88k", input_size=224),
         ]
     apply_profile(cfg, None)
+    cfg.attack.validate_noise()
     return cfg

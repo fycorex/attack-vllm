@@ -3,13 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import random
+import time
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from augmentations import AttackAugmentationPipeline
+from augmentations import AttackAugmentationPipeline, effective_sigma, sample_noise
 from caption_victim import CaptionVictim
 from config import AttackConfig, config_to_dict, enabled_surrogate_names, load_config
 from data import AttackItem, load_image_tensor, load_manifest, normalize_image_size, save_tensor_image, tensor_to_pil_image
@@ -251,6 +252,9 @@ class CaptionAttackRunner:
         return self.qwen_vl_victim.evaluate(clean_image, adv_image, item)
 
     def attack_item(self, item: AttackItem) -> dict:
+        started_at = time.monotonic()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
         example_cache = self._precompute_example_embeddings(item)
         base_size = self._base_attack_size()
         clean = load_image_tensor(item.image_path, base_size).unsqueeze(0).to(self.device)
@@ -263,7 +267,14 @@ class CaptionAttackRunner:
         history = []
         patch_drop_rate = self.config.attack.patch_drop_rate if self.config.attack.enable_patch_drop else 0.0
         drop_path_max_rate = self.config.attack.drop_path_max_rate if self.config.attack.enable_drop_path else 0.0
-        augmentation_batches = max(1, int(self.config.attack.augmentation_batches))
+        explicit_noise_eot = self.config.attack.noise_mode.endswith("_eot")
+        explicit_geometry_eot = self.config.attack.geometry_mode not in {"legacy", "none"}
+        explicit_eot = explicit_noise_eot or explicit_geometry_eot
+        noise_samples = int(self.config.attack.noise_samples) if explicit_eot else 1
+        if not explicit_noise_eot:
+            noise_samples = 1
+        geometry_samples = int(self.config.attack.geometry_samples) if explicit_geometry_eot else 1
+        augmentation_batches = max(1, int(self.config.attack.augmentation_batches)) * noise_samples * geometry_samples
         augmentation_forward_batch_size = max(1, int(self.config.attack.augmentation_forward_batch_size))
         metrics_interval = int(self.config.attack.metrics_interval)
 
@@ -274,6 +285,7 @@ class CaptionAttackRunner:
 
             total_loss_value = 0.0
             step_metrics = {}
+            step_noise_stats = {"sample_count": 0, "sum": 0.0, "sum_sq": 0.0, "saturated_fraction": 0.0}
 
             for surrogate in self.surrogates:
                 if self.config.runtime.sequential_surrogates:
@@ -289,11 +301,31 @@ class CaptionAttackRunner:
                     bounded_delta = delta.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)
                     adv = (clean + bounded_delta).clamp(0.0, 1.0)
                     surrogate_input = self._resize_for_surrogate(adv, surrogate.config.input_size)
-                    surrogate_input = self._augment_for_surrogate(
-                        pipelines[surrogate.config.input_size],
-                        surrogate_input,
-                        current_batch_size,
-                    )
+                    if explicit_eot:
+                        sigma = effective_sigma(self.config.attack, self.config.attack.epsilon, step / max(1, self.config.attack.steps - 1))
+                        generated = []
+                        generator = torch.Generator(device=surrogate_input.device)
+                        generator.manual_seed(self.config.runtime.seed * 1_000_003 + step * 10_007 + aug_start)
+                        anti = None
+                        for local_idx in range(current_batch_size):
+                            if self.config.attack.noise_mode == "antithetic_gaussian_eot":
+                                if local_idx % 2 == 0:
+                                    anti = sample_noise("gaussian_eot", surrogate_input, sigma, generator=generator)
+                                noise = anti if local_idx % 2 == 0 else -anti
+                            elif explicit_noise_eot:
+                                noise = sample_noise(self.config.attack.noise_mode, surrogate_input, sigma, generator=generator)
+                            else:
+                                noise = torch.zeros_like(surrogate_input)
+                            noisy = pipelines[surrogate.config.input_size](surrogate_input, self.config.attack.epsilon, noise=noise, generator=generator)
+                            generated.append(noisy)
+                            if collect_step_metrics:
+                                step_noise_stats["sample_count"] += 1
+                                step_noise_stats["sum"] += float(noise.mean().detach().cpu())
+                                step_noise_stats["sum_sq"] += float(noise.square().mean().detach().cpu())
+                                step_noise_stats["saturated_fraction"] += float(((surrogate_input + noise <= 0) | (surrogate_input + noise >= 1)).float().mean().detach().cpu())
+                        surrogate_input = torch.cat(generated, dim=0)
+                    else:
+                        surrogate_input = self._augment_for_surrogate(pipelines[surrogate.config.input_size], surrogate_input, current_batch_size)
                     embeddings = surrogate.encode_image(
                         surrogate_input,
                         patch_drop_rate=patch_drop_rate,
@@ -348,11 +380,20 @@ class CaptionAttackRunner:
                     delta_ema.copy_(delta.detach())
 
             if collect_step_metrics:
+                count = max(1, int(step_noise_stats["sample_count"]))
                 history.append(
                     {
                         "step": step,
                         "loss": total_loss_value,
                         "surrogates": step_metrics,
+                        "noise": {
+                            "mode": self.config.attack.noise_mode,
+                            "samples": noise_samples,
+                            "mean": step_noise_stats["sum"] / count,
+                            "second_moment": step_noise_stats["sum_sq"] / count,
+                            "saturated_fraction": step_noise_stats["saturated_fraction"] / count,
+                        },
+                        "surrogate_forwards": len(self.surrogates) * augmentation_batches,
                     }
                 )
 
@@ -398,6 +439,19 @@ class CaptionAttackRunner:
             "ollama_eval": ollama_eval,
             "qwen_vl_eval": qwen_vl_eval,
             "history": history,
+            "noise_method": {
+                "mode": self.config.attack.noise_mode,
+                "sigma": self.config.attack.noise_sigma,
+                "samples": noise_samples,
+                "geometry_mode": self.config.attack.geometry_mode,
+                "geometry_samples": geometry_samples,
+                "schedule": self.config.attack.noise_schedule,
+                "total_surrogate_forwards": len(self.surrogates) * augmentation_batches * self.config.attack.steps,
+            },
+            "runtime_diagnostics": {
+                "elapsed_seconds": time.monotonic() - started_at,
+                "peak_cuda_memory_bytes": torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0,
+            },
         }
         (item_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
         return result

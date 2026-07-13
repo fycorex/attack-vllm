@@ -1,0 +1,70 @@
+version: 1
+selection_metric: heldout_macro_asr
+
+datasets:
+  caption_caltech:
+    attack_config: configs/caption_attack_paper_eps8.yaml
+    manifest: data/caltech_large/manifest.json
+    task: caption
+  receipt_ocr:
+    attack_config: configs/receipt_text_eps16.yaml
+    manifest: outputs/prepared_datasets/receipt_independent_balanced19/manifest.json
+    task: receipt_ocr
+
+surrogate_groups:
+  vit_resnet_diverse:
+    rationale: Fixed audited ViT plus ResNet group; held-out architectures and checkpoints are disjoint.
+    sequential: false
+    attack:
+      - {model_name: ViT-B-32, pretrained: laion2b_s34b_b79k, input_size: 224}
+      - {model_name: RN50, pretrained: openai, input_size: 224}
+    heldout:
+      - {model_name: ViT-B-16, pretrained: openai, input_size: 224}
+      - {model_name: RN101, pretrained: openai, input_size: 224}
+
+stages:
+  stage0_geometric:
+    datasets: [caption_caltech]
+    surrogate_groups: [vit_resnet_diverse]
+    items: 4
+    steps: 20
+    seeds: [42]
+    noise: {modes: [], sigmas: [], samples: []}
+    explicit_conditions:
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: none, geometry_samples: 1}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: translation, geometry_samples: 2}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: resize_pad, geometry_samples: 2}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: scale, geometry_samples: 2}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: geometric_mixture, geometry_samples: 2}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 2, geometry_mode: geometric_mixture, geometry_samples: 2}
+  equal_steps_geometric:
+    datasets: [caption_caltech, receipt_ocr]
+    surrogate_groups: [vit_resnet_diverse]
+    items: 20
+    steps: 100
+    seeds: [42, 123, 2026]
+    noise: {modes: [], sigmas: [], samples: []}
+    explicit_conditions:
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: none, geometry_samples: 1}
+      - {mode: paper_gaussian_single_sample, sigma: 0.0078431373, samples: 1, geometry_mode: none, geometry_samples: 1}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 4, geometry_mode: none, geometry_samples: 1}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: translation, geometry_samples: 4}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: resize_pad, geometry_samples: 4}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: scale, geometry_samples: 4}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: geometric_mixture, geometry_samples: 4}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 2, geometry_mode: geometric_mixture, geometry_samples: 2}
+  equal_forward_geometric:
+    datasets: [caption_caltech, receipt_ocr]
+    surrogate_groups: [vit_resnet_diverse]
+    items: 20
+    steps: 100
+    seeds: [42, 123, 2026]
+    noise: {modes: [], sigmas: [], samples: []}
+    explicit_conditions:
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: none, geometry_samples: 1, steps: 400, budget_label: 400_forward_units}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 4, geometry_mode: none, geometry_samples: 1, steps: 100, budget_label: 400_forward_units}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: translation, geometry_samples: 4, steps: 100, budget_label: 400_forward_units}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: resize_pad, geometry_samples: 4, steps: 100, budget_label: 400_forward_units}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: scale, geometry_samples: 4, steps: 100, budget_label: 400_forward_units}
+      - {mode: none, sigma: 0.0, samples: 1, geometry_mode: geometric_mixture, geometry_samples: 4, steps: 100, budget_label: 400_forward_units}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 2, geometry_mode: geometric_mixture, geometry_samples: 2, steps: 100, budget_label: 400_forward_units}
