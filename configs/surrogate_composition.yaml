@@ -1,0 +1,102 @@
+version: 1
+
+models:
+  vit_b32_laion:
+    {model_name: ViT-B-32, pretrained: laion2b_s34b_b79k, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: laion2b, patch_size: 32}
+  vit_b16_laion:
+    {model_name: ViT-B-16, pretrained: laion2b_s34b_b88k, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: laion2b, patch_size: 16}
+  vit_b32_openai:
+    {model_name: ViT-B-32, pretrained: openai, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: openai, patch_size: 32}
+  rn50_openai:
+    {model_name: RN50, pretrained: openai, input_size: 224,
+     architecture_family: resnet, objective_family: clip, pretraining_family: openai}
+  vit_b16_openai_heldout:
+    {model_name: ViT-B-16, pretrained: openai, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: openai, patch_size: 16}
+  rn101_openai_heldout:
+    {model_name: RN101, pretrained: openai, input_size: 224,
+     architecture_family: resnet, objective_family: clip, pretraining_family: openai}
+  vit_l14_openai_heldout:
+    {model_name: ViT-L-14, pretrained: openai, input_size: 224,
+     architecture_family: vit_l, objective_family: clip, pretraining_family: openai, patch_size: 14}
+  vit_h14_laion:
+    {model_name: ViT-H-14, pretrained: laion2b_s32b_b79k, input_size: 224,
+     architecture_family: vit_h, objective_family: clip, pretraining_family: laion2b, patch_size: 14}
+  vit_h14_metaclip_fullcc:
+    {model_name: ViT-H-14, pretrained: metaclip_fullcc, input_size: 224,
+     architecture_family: vit_h, objective_family: clip, pretraining_family: metaclip, patch_size: 14}
+  vit_h14_metaclip_altogether:
+    {model_name: ViT-H-14, pretrained: metaclip_altogether, input_size: 224,
+     architecture_family: vit_h, objective_family: clip, pretraining_family: metaclip, patch_size: 14}
+  vit_h14_dfn378:
+    {model_name: ViT-H-14-378, pretrained: dfn5b, input_size: 378,
+     architecture_family: vit_h, objective_family: clip, pretraining_family: dfn, patch_size: 14}
+  siglip_b16_224:
+    {model_name: ViT-B-16-SigLIP, pretrained: webli, input_size: 224,
+     architecture_family: vit_b, objective_family: siglip, pretraining_family: webli, patch_size: 16}
+  siglip_b16_384:
+    {model_name: ViT-B-16-SigLIP-384, pretrained: webli, input_size: 384,
+     architecture_family: vit_b, objective_family: siglip, pretraining_family: webli, patch_size: 16}
+  siglip_l16_384:
+    {model_name: ViT-L-16-SigLIP-384, pretrained: webli, input_size: 384,
+     architecture_family: vit_l, objective_family: siglip, pretraining_family: webli, patch_size: 16}
+  convnext_xxl_224:
+    {model_name: convnext_xxlarge, pretrained: laion2b_s34b_b82k_augreg, input_size: 224,
+     architecture_family: convnext, objective_family: clip, pretraining_family: laion2b}
+
+heldout_models: [vit_b16_openai_heldout, rn101_openai_heldout, vit_l14_openai_heldout]
+
+sets:
+  single_reference:
+    models: [vit_b32_laion]
+    rationale: Lightweight single-proxy blind-selection reference.
+  single_vit_b16_laion:
+    models: [vit_b16_laion]
+    rationale: Second lightweight single proxy for the blind-selection distribution.
+  single_vit_b32_openai:
+    models: [vit_b32_openai]
+    rationale: OpenAI-pretrained ViT-B single proxy.
+  single_rn50_openai:
+    models: [rn50_openai]
+    rationale: ResNet single proxy and architecture-family control.
+  two_homogeneous:
+    models: [vit_b32_laion, vit_b16_laion]
+    rationale: Same ViT-B and LAION/CLIP families with different patch sizes.
+  four_lightweight_mixed:
+    models: [vit_b32_laion, vit_b16_laion, vit_b32_openai, rn50_openai]
+    rationale: Feasible four-proxy pilot; measured redundancy, not its label, determines diversity.
+  incremental_three:
+    models: [vit_b32_laion, vit_b16_laion, rn50_openai]
+    rationale: Third step in the lightweight incremental-addition sequence.
+  leave_out_vit_b32_laion:
+    models: [vit_b16_laion, vit_b32_openai, rn50_openai]
+    rationale: Leave-one-out condition for the four-model lightweight set.
+  leave_out_vit_b16_laion:
+    models: [vit_b32_laion, vit_b32_openai, rn50_openai]
+    rationale: Leave-one-out condition for the four-model lightweight set.
+  leave_out_vit_b32_openai:
+    models: [vit_b32_laion, vit_b16_laion, rn50_openai]
+    rationale: Leave-one-out condition for the four-model lightweight set.
+  leave_out_rn50_openai:
+    models: [vit_b32_laion, vit_b16_laion, vit_b32_openai]
+    rationale: Leave-one-out condition for the four-model lightweight set.
+  four_homogeneous_current:
+    models: [vit_h14_laion, vit_h14_metaclip_fullcc, vit_h14_metaclip_altogether, vit_h14_dfn378]
+    rationale: ViT-H family with multiple pretraining sources/resolutions.
+  four_architecture_objective_mixed:
+    models: [vit_h14_laion, siglip_b16_224, siglip_l16_384, convnext_xxl_224]
+    rationale: ViT-H, SigLIP ViTs and ConvNeXt candidate; low redundancy must be measured.
+  eight_current:
+    models: [vit_h14_laion, vit_h14_metaclip_fullcc, vit_h14_metaclip_altogether,
+             vit_h14_dfn378, siglip_b16_224, siglip_b16_384, siglip_l16_384, convnext_xxl_224]
+    rationale: Existing practical eight-surrogate configuration.
+  leave_out_siglip:
+    models: [vit_h14_laion, vit_h14_metaclip_fullcc, vit_h14_metaclip_altogether, vit_h14_dfn378, convnext_xxl_224]
+    rationale: Leave the SigLIP objective family out of the current ensemble.
+  leave_out_convnext:
+    models: [vit_h14_laion, vit_h14_metaclip_fullcc, vit_h14_metaclip_altogether,
+             vit_h14_dfn378, siglip_b16_224, siglip_b16_384, siglip_l16_384]
+    rationale: Leave the ConvNeXt architecture family out of the current ensemble.

@@ -1,0 +1,62 @@
+version: 1
+composition_config: configs/surrogate_composition.yaml
+datasets:
+  caption_caltech:
+    base_attack_config: configs/caption_attack_paper_eps8.yaml
+    manifest: data/caltech_large/manifest.json
+    augmentation_samples_per_step: 4
+  llava_vqa:
+    base_attack_config: configs/llava_bench_vqa_eps16.yaml
+    manifest: data/llava_bench_coco_vqa/manifest.json
+    augmentation_samples_per_step: 4
+  receipt_ocr:
+    base_attack_config: configs/receipt_text_eps16.yaml
+    manifest: data/trainingdatapro_receipts_text/manifest.json
+    augmentation_samples_per_step: 4
+
+stages:
+  stage0b:
+    datasets: [caption_caltech]
+    sets: [single_reference, single_vit_b16_laion, two_homogeneous, four_lightweight_mixed]
+    items: 4
+    steps: 20
+    seeds: [42]
+    budget_mode: equal_steps
+  stage1_single:
+    datasets: [caption_caltech]
+    sets: [single_reference, single_vit_b16_laion, single_vit_b32_openai, single_rn50_openai]
+    items: 20
+    steps: 100
+    seeds: [42, 123, 2026]
+    budget_mode: equal_steps
+  stage2_equal_steps:
+    datasets: [caption_caltech]
+    sets: [single_reference, two_homogeneous, four_lightweight_mixed]
+    items: 20
+    steps: 100
+    seeds: [42, 123, 2026]
+    budget_mode: equal_steps
+  stage2_equal_forwards:
+    datasets: [caption_caltech]
+    sets: [single_reference, two_homogeneous, four_lightweight_mixed]
+    items: 20
+    reference_steps: 400
+    seeds: [42, 123, 2026]
+    budget_mode: equal_forwards
+  stage2_incremental_leaveout:
+    datasets: [caption_caltech]
+    sets: [single_reference, two_homogeneous, incremental_three, four_lightweight_mixed,
+           leave_out_vit_b32_laion, leave_out_vit_b16_laion,
+           leave_out_vit_b32_openai, leave_out_rn50_openai]
+    items: 20
+    steps: 100
+    seeds: [42, 123, 2026]
+    budget_mode: equal_steps
+  stage3_cross_dataset:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    # Replace with held-out-selected frozen candidates before launching.
+    sets: [single_reference, two_homogeneous, four_lightweight_mixed]
+    items: 50
+    steps: 300
+    seeds: [42, 123, 2026]
+    budget_mode: equal_steps

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import random
+import time
 
 import numpy as np
 import torch
@@ -20,6 +21,7 @@ from gpt_victim import GPTVictim
 from ollama_victim import OllamaVictim
 from qwen_vl_victim import QwenVLVictim
 from surrogates import create_surrogate, unload_surrogate
+from surrogate_composition import gradient_diagnostics
 from vqa_victim import VQAVictim
 
 
@@ -172,6 +174,8 @@ class CaptionAttackRunner:
         per_surrogate = {}
         clean_margins = []
         adv_margins = []
+        clean_prototype_distances = []
+        adversarial_prototype_distances = []
 
         for surrogate in self.surrogates:
             if self.config.runtime.sequential_surrogates:
@@ -192,9 +196,19 @@ class CaptionAttackRunner:
                 top_k=self.config.attack.top_k,
                 success_margin_threshold=self.config.evaluation.success_margin_threshold,
             )
+            positive_prototype = F.normalize(positive_embeddings.mean(dim=0, keepdim=True), dim=-1)
+            clean_prototype_distance = float(torch.linalg.vector_norm(clean_emb - positive_prototype).detach().cpu())
+            adversarial_prototype_distance = float(torch.linalg.vector_norm(adv_emb - positive_prototype).detach().cpu())
+            result.update({
+                "clean_target_prototype_distance": clean_prototype_distance,
+                "adversarial_target_prototype_distance": adversarial_prototype_distance,
+                "target_prototype_distance_change": adversarial_prototype_distance - clean_prototype_distance,
+            })
             per_surrogate[surrogate.name] = result
             clean_margins.append(result["clean_margin"])
             adv_margins.append(result["adversarial_margin"])
+            clean_prototype_distances.append(clean_prototype_distance)
+            adversarial_prototype_distances.append(adversarial_prototype_distance)
             if self.config.runtime.sequential_surrogates:
                 unload_surrogate(surrogate)
 
@@ -205,6 +219,12 @@ class CaptionAttackRunner:
             "adversarial_margin": adversarial_margin,
             "margin_gain": adversarial_margin - clean_margin,
             "proxy_success": adversarial_margin > self.config.evaluation.success_margin_threshold and adversarial_margin > clean_margin,
+            "mean_clean_target_prototype_distance": float(sum(clean_prototype_distances) / len(clean_prototype_distances)),
+            "mean_adversarial_target_prototype_distance": float(sum(adversarial_prototype_distances) / len(adversarial_prototype_distances)),
+            "mean_target_prototype_distance_change": float(
+                sum(adversarial_prototype_distances) / len(adversarial_prototype_distances)
+                - sum(clean_prototype_distances) / len(clean_prototype_distances)
+            ),
             "per_surrogate": per_surrogate,
         }
 
@@ -251,6 +271,9 @@ class CaptionAttackRunner:
         return self.qwen_vl_victim.evaluate(clean_image, adv_image, item)
 
     def attack_item(self, item: AttackItem) -> dict:
+        started_at = time.monotonic()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
         example_cache = self._precompute_example_embeddings(item)
         base_size = self._base_attack_size()
         clean = load_image_tensor(item.image_path, base_size).unsqueeze(0).to(self.device)
@@ -274,8 +297,10 @@ class CaptionAttackRunner:
 
             total_loss_value = 0.0
             step_metrics = {}
+            surrogate_gradients = {}
 
             for surrogate in self.surrogates:
+                gradient_before = delta.grad.detach().clone() if collect_step_metrics and delta.grad is not None else None
                 if self.config.runtime.sequential_surrogates:
                     self._move_surrogate(surrogate, self.device)
                 positive_embeddings = example_cache[surrogate.name]["positive_embeddings"].to(self.device)
@@ -330,6 +355,10 @@ class CaptionAttackRunner:
                         surrogate_metrics_total,
                         surrogate_metrics_weight,
                     )
+                    current_gradient = delta.grad.detach()
+                    surrogate_gradients[surrogate.name] = (
+                        current_gradient.clone() if gradient_before is None else current_gradient - gradient_before
+                    )
                 if self.config.runtime.sequential_surrogates:
                     unload_surrogate(surrogate)
 
@@ -353,6 +382,8 @@ class CaptionAttackRunner:
                         "step": step,
                         "loss": total_loss_value,
                         "surrogates": step_metrics,
+                        "composition": gradient_diagnostics(surrogate_gradients),
+                        "surrogate_forwards": len(self.surrogates) * augmentation_batches,
                     }
                 )
 
@@ -398,6 +429,13 @@ class CaptionAttackRunner:
             "ollama_eval": ollama_eval,
             "qwen_vl_eval": qwen_vl_eval,
             "history": history,
+            "composition_diagnostics": {
+                "method": "equal_loss_mean",
+                "surrogate_count": len(self.surrogates),
+                "total_surrogate_forwards": len(self.surrogates) * augmentation_batches * self.config.attack.steps,
+                "elapsed_seconds": time.monotonic() - started_at,
+                "peak_cuda_memory_bytes": torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0,
+            },
         }
         (item_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
         return result
