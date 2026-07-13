@@ -41,10 +41,13 @@ Global alignment does not predict transfer in this matrix:
 | NO@5 | -0.025 | [-0.691, 0.578] |
 | NO@10 | 0.014 | [-0.662, 0.628] |
 
-The distance chain is partially supported. `delta D_proxy` and `delta D_target`
-have Spearman 0.309, CI [0.240, 0.373]. More negative `delta D_target` predicts
-target success with Spearman -0.391, CI [-0.455, -0.321]. Successful rows reduce
-target distance by 0.0502 on average versus 0.0008 for failures.
+The distance chain is partially supported. Intervals below use an item-clustered
+bootstrap, retaining all seed, proxy, and target observations for each of the 20
+unique images. `delta D_proxy` and `delta D_target` have Spearman 0.309, CI
+[0.168, 0.451]. More negative `delta D_target` predicts target success with
+Spearman -0.391, CI [-0.527, -0.226]. Successful rows reduce target distance by
+0.0502 on average versus 0.0008 for failures. The direct association between
+`delta D_proxy` and target success is weaker (-0.184, CI [-0.365, 0.039]).
 
 The claimed CKA-to-neighborhood relationship depends on neighborhood scale.
 Centered CKA has little association with NO@1 (-0.116, interval crosses zero),
