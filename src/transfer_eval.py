@@ -229,9 +229,18 @@ def summarize(records: list[dict], bootstrap_samples: int = 2000) -> dict:
     paired = [p for p in pairs.values() if "clean" in p and "adversarial" in p]
     valid = [p for p in paired if not p["clean"].get("error") and not p["adversarial"].get("error")]
     cond = [conditioned_success(p["clean"].get("target_success", False), p["adversarial"].get("target_success", False)) for p in paired]
+    source_clusters: dict[str, list[bool]] = {}
+    for index, pair in enumerate(paired):
+        clean = pair["clean"]
+        cluster_id = str(clean.get("image_sha256") or clean.get("evaluation_sample_id") or clean.get("item_id") or index)
+        source_clusters.setdefault(cluster_id, []).append(cond[index])
     rng = random.Random(0); estimates = []
-    if cond:
-        for _ in range(bootstrap_samples): estimates.append(sum(rng.choice(cond) for _ in cond) / len(cond))
+    cluster_names = sorted(source_clusters)
+    if cond and cluster_names:
+        for _ in range(bootstrap_samples):
+            sampled = [rng.choice(cluster_names) for _ in cluster_names]
+            values = [value for name in sampled for value in source_clusters[name]]
+            estimates.append(sum(values) / len(values))
         estimates.sort(); ci = [estimates[int(.025 * (len(estimates)-1))], estimates[int(.975 * (len(estimates)-1))]]
     else: ci = [None, None]
     denominator = len(paired)
@@ -240,9 +249,12 @@ def summarize(records: list[dict], bootstrap_samples: int = 2000) -> dict:
             "reused_response_records": attempted-actual_requests,
             "valid_requests": attempted-failures, "attempted_pairs": len(pairs),
             "paired_item_count": denominator, "valid_pair_count": len(valid), "api_failure_rate": failures/attempted if attempted else 0,
+            "unique_source_image_count": len(source_clusters),
             "refusal_rate": refusals/attempted if attempted else 0, "clean_target_success_rate": sum(p["clean"].get("target_success", False) for p in paired)/denominator if denominator else 0,
             "adversarial_target_success_rate": sum(p["adversarial"].get("target_success", False) for p in paired)/denominator if denominator else 0,
             "conditioned_asr": sum(cond)/denominator if denominator else 0, "conditioned_asr_ci95": ci,
+            "source_macro_conditioned_asr": (sum(sum(values) / len(values) for values in source_clusters.values()) / len(source_clusters)
+                                               if source_clusters else 0),
             "source_suppression_rate": sum(not p["adversarial"].get("source_present", False) for p in paired)/denominator if denominator else 0}
 
 

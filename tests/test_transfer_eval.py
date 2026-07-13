@@ -73,6 +73,25 @@ class TransferEvalTests(unittest.TestCase):
         self.assertEqual(result["paired_item_count"], 2)
         self.assertEqual(result["conditioned_asr"], 1.0)
 
+    def test_bootstrap_clusters_questions_from_same_source_image(self):
+        base = {"provider": "p", "model_id": "m", "refusal": False,
+                "source_present": False, "error": None}
+        rows = []
+        for sample, image_hash, success in (("question-a", "same-image", True),
+                                            ("question-b", "same-image", False),
+                                            ("question-c", "other-image", False)):
+            rows.extend([
+                {**base, "item_id": sample, "evaluation_sample_id": sample, "image_sha256": image_hash,
+                 "condition": "clean", "target_success": False},
+                {**base, "item_id": sample, "evaluation_sample_id": sample, "image_sha256": f"adv-{sample}",
+                 "condition": "adversarial", "target_success": success},
+            ])
+        result = summarize(rows, 100)
+        self.assertEqual(result["paired_item_count"], 3)
+        self.assertEqual(result["unique_source_image_count"], 2)
+        self.assertAlmostEqual(result["conditioned_asr"], 1 / 3)
+        self.assertAlmostEqual(result["source_macro_conditioned_asr"], .25)
+
     def test_atomic_append(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "x.jsonl"; append_jsonl(path, {"x": 1}); append_jsonl(path, {"x": 2})
