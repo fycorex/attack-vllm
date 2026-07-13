@@ -60,3 +60,11 @@ stages:
     steps: 300
     seeds: [42, 123, 2026]
     budget_mode: equal_steps
+  stage3_cross_dataset_equal_forwards:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    # Frozen from held-out selection before launching.
+    sets: [single_reference, two_homogeneous, four_lightweight_mixed]
+    items: 50
+    reference_steps: 1200
+    seeds: [42, 123, 2026]
+    budget_mode: equal_forwards

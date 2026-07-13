@@ -50,6 +50,7 @@ def main() -> None:
     parser.add_argument("--items", type=int, default=19)
     parser.add_argument("--top-k", type=int, default=2)
     parser.add_argument("--minimum-seeds", type=int, default=3)
+    parser.add_argument("--validation-stage", default=VALIDATION_STAGE)
     parser.add_argument("--dataset-manifest", action="append", default=[], metavar="NAME=PATH")
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--device", default="cuda")
@@ -60,6 +61,9 @@ def main() -> None:
 
     base_path = Path(args.base_spec)
     base = yaml.safe_load(base_path.read_text(encoding="utf-8"))
+    validation_stage = args.validation_stage
+    if validation_stage not in base.get("stages", {}):
+        parser.error(f"unknown validation stage: {validation_stage}")
     expected_selection = expected_trial_count(base, SELECTION_STAGE)
     validate_stage(Path(args.selection_root), SELECTION_STAGE, expected_selection)
 
@@ -73,7 +77,7 @@ def main() -> None:
     ], check=True)
     analysis_csv = analysis_output / "all_transfer_results.csv"
     overrides = parse_manifest_overrides(args.dataset_manifest)
-    required_datasets = set(base["stages"][VALIDATION_STAGE]["datasets"])
+    required_datasets = set(base["stages"][validation_stage]["datasets"])
     if set(overrides) != required_datasets:
         missing = sorted(required_datasets - set(overrides))
         extra = sorted(set(overrides) - required_datasets)
@@ -92,16 +96,19 @@ def main() -> None:
         minimum_seeds=args.minimum_seeds,
         stage3_items=args.items,
         dataset_manifests=overrides,
+        target_stage=validation_stage,
     )
     frozen = yaml.safe_load(frozen_path.read_text(encoding="utf-8"))
-    selected = frozen["stages"][VALIDATION_STAGE]["sets"]
-    expected_validation = expected_trial_count(frozen, VALIDATION_STAGE)
+    selected = frozen["stages"][validation_stage]["sets"]
+    expected_validation = expected_trial_count(frozen, validation_stage)
     plan = {
         "selection_trials_validated": expected_selection,
         "selection_source": evidence["selection_source"],
         "api_results_used_for_selection": evidence["api_results_used_for_selection"],
         "selected_methods": selected,
-        "datasets": frozen["stages"][VALIDATION_STAGE]["datasets"],
+        "validation_stage": validation_stage,
+        "budget_mode": frozen["stages"][validation_stage]["budget_mode"],
+        "datasets": frozen["stages"][validation_stage]["datasets"],
         "items_per_trial": args.items,
         "seeds": frozen["stages"][VALIDATION_STAGE]["seeds"],
         "expected_validation_trials": expected_validation,
@@ -118,14 +125,14 @@ def main() -> None:
     spec_dir = validation_root / "generated_specs"
     spec_dir.mkdir(parents=True, exist_ok=True)
     run_parallel(
-        stage_specs(frozen, VALIDATION_STAGE, spec_dir),
-        VALIDATION_STAGE,
+        stage_specs(frozen, validation_stage, spec_dir),
+        validation_stage,
         validation_root,
         args.python,
         args.device,
         args.cache_dir,
     )
-    validate_stage(validation_root, VALIDATION_STAGE, expected_validation)
+    validate_stage(validation_root, validation_stage, expected_validation)
     subprocess.run([
         args.python,
         "scripts/analyze_surrogate_experiments.py",

@@ -74,6 +74,14 @@ sets: {bad: {models: [x], rationale: bad}}
             if isinstance(value, dict) and "enabled" in value:
                 self.assertFalse(value["enabled"])
 
+    def test_cross_dataset_equal_forward_budget(self):
+        experiment = yaml.safe_load(Path("configs/surrogate_experiments.yaml").read_text())
+        composition = load_composition_spec(experiment["composition_config"])
+        trials = stage_trials(experiment, composition, "stage3_cross_dataset_equal_forwards")
+        self.assertEqual({trial["forward_units_per_item"] for trial in trials}, {4800})
+        steps = {trial["surrogate_set"]: trial["steps"] for trial in trials if trial["dataset"] == "caption_caltech" and trial["seed"] == 42}
+        self.assertEqual(steps, {"single_reference": 1200, "two_homogeneous": 600, "four_lightweight_mixed": 300})
+
     def test_attack_output_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

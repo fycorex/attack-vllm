@@ -74,17 +74,18 @@ def select_methods(rows: list[dict[str, str]], *, stage: str, budget_mode: str,
 def freeze(base_spec: Path, analysis_csv: Path, output: Path, *, stage: str = "stage2_equal_forwards",
            budget_mode: str = "equal_forwards", selection_dataset: str = "caption_caltech",
            baseline: str = "single_reference", top_k: int = 2, minimum_seeds: int = 3,
-           stage3_items: int | None = None, dataset_manifests: dict[str, Path] | None = None) -> dict[str, Any]:
+           stage3_items: int | None = None, dataset_manifests: dict[str, Path] | None = None,
+           target_stage: str = "stage3_cross_dataset") -> dict[str, Any]:
     with analysis_csv.open(newline="", encoding="utf-8") as handle:
         selected = select_methods(list(csv.DictReader(handle)), stage=stage, budget_mode=budget_mode,
                                   dataset=selection_dataset, baseline=baseline, top_k=top_k,
                                   minimum_seeds=minimum_seeds)
     spec = yaml.safe_load(base_spec.read_text(encoding="utf-8"))
-    if "stage3_cross_dataset" not in spec.get("stages", {}):
-        raise ValueError("Base spec has no stage3_cross_dataset")
+    if target_stage not in spec.get("stages", {}):
+        raise ValueError(f"Base spec has no {target_stage}")
     if stage3_items is not None:
-        spec["stages"]["stage3_cross_dataset"]["items"] = stage3_items
-    effective_items = int(spec["stages"]["stage3_cross_dataset"]["items"])
+        spec["stages"][target_stage]["items"] = stage3_items
+    effective_items = int(spec["stages"][target_stage]["items"])
     manifest_audits = {}
     for dataset, path in (dataset_manifests or {}).items():
         if dataset not in spec.get("datasets", {}):
@@ -92,16 +93,17 @@ def freeze(base_spec: Path, analysis_csv: Path, output: Path, *, stage: str = "s
         audit = audit_manifest(path, effective_items)
         spec["datasets"][dataset]["manifest"] = audit["path"]
         manifest_audits[dataset] = audit
-    for dataset in spec["stages"]["stage3_cross_dataset"]["datasets"]:
+    for dataset in spec["stages"][target_stage]["datasets"]:
         path = Path(spec["datasets"][dataset]["manifest"])
         if dataset not in manifest_audits:
             manifest_audits[dataset] = audit_manifest(path, effective_items)
-    spec["stages"]["stage3_cross_dataset"]["sets"] = [row["surrogate_set"] for row in selected]
+    spec["stages"][target_stage]["sets"] = [row["surrogate_set"] for row in selected]
     evidence = {"created_at": datetime.now(timezone.utc).isoformat(),
                 "selection_source": "heldout_open_source_only", "api_results_used_for_selection": False,
                 "analysis_csv": str(analysis_csv.resolve()), "analysis_csv_sha256": sha256(analysis_csv),
                 "source_spec": str(base_spec.resolve()), "source_spec_sha256": sha256(base_spec),
                 "stage": stage, "budget_mode": budget_mode, "selection_dataset": selection_dataset,
+                "target_stage": target_stage,
                 "minimum_seeds": minimum_seeds, "baseline": baseline, "top_k_nonbaseline": top_k,
                 "stage3_items": effective_items, "dataset_manifests": manifest_audits, "selected": selected}
     canonical = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
@@ -126,6 +128,7 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=2)
     parser.add_argument("--minimum-seeds", type=int, default=3)
     parser.add_argument("--stage3-items", type=int)
+    parser.add_argument("--target-stage", default="stage3_cross_dataset")
     parser.add_argument("--dataset-manifest", action="append", default=[], metavar="NAME=PATH",
                         help="Override and audit a Stage 3 dataset manifest; may be repeated.")
     args = parser.parse_args()
@@ -137,7 +140,8 @@ def main() -> None:
     result = freeze(Path(args.base_spec), Path(args.analysis_csv), Path(args.output), stage=args.stage,
                     budget_mode=args.budget_mode, selection_dataset=args.selection_dataset,
                     baseline=args.baseline, top_k=args.top_k, minimum_seeds=args.minimum_seeds,
-                    stage3_items=args.stage3_items, dataset_manifests=overrides)
+                    stage3_items=args.stage3_items, dataset_manifests=overrides,
+                    target_stage=args.target_stage)
     print(json.dumps({"output": args.output, "selected": [row["surrogate_set"] for row in result["selected"]],
                       "freeze_hash": result["freeze_hash"]}, indent=2))
 
