@@ -35,6 +35,23 @@ class FreezeApiCandidateTests(unittest.TestCase):
                                      minimum_seeds=3, minimum_targets=2)
         self.assertEqual(selected, [])
 
+    def test_dataset_filter_includes_baseline_plus_ranked_candidate(self):
+        rows = []
+        for dataset in ("caption", "vqa"):
+            for name, asr in (("baseline", .2), ("candidate_a", .7), ("candidate_b", .6)):
+                for seed in (1, 2, 3):
+                    rows.append({"stage": "s", "budget_mode": "equal", "dataset": dataset,
+                        "surrogate_set": name, "seed": seed, "target": "t1", "asr": asr,
+                        "mean_margin_gain": asr / 10, "items": 20, "valid_items": 20,
+                        "missing_items": 0, "directory": f"/tmp/{dataset}/{name}/{seed}"})
+        selected = select_candidates(
+            rows, stage="s", budget_mode="equal", top_k=1, minimum_seeds=3,
+            datasets={"vqa"}, baseline="baseline",
+        )
+        self.assertEqual([row["dataset"] for row in selected], ["vqa", "vqa"])
+        self.assertEqual([row["surrogate_set"] for row in selected], ["baseline", "candidate_a"])
+        self.assertEqual([row["selection_role"] for row in selected], ["baseline", "candidate"])
+
     def test_frozen_manifest_detects_tampering(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td); attack = root / "attack"; attack.mkdir()
@@ -50,6 +67,7 @@ class FreezeApiCandidateTests(unittest.TestCase):
             self.assertEqual(directories, [attack.resolve()]); self.assertEqual(info["candidate_count"], 1)
             metadata = info["directory_metadata"][str(attack.resolve())]
             self.assertEqual(metadata["candidate_id"], "caption::two::1")
+            self.assertIsNone(metadata["candidate_selection_role"])
             value["candidates"][0]["attack_output_directories"] = []
             manifest.write_text(json.dumps(value))
             with self.assertRaisesRegex(ValueError, "hash mismatch"):

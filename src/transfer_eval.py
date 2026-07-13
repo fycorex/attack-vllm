@@ -108,7 +108,8 @@ def load_frozen_candidate_manifest(path: str | Path) -> tuple[list[Path], dict[s
                            f"{candidate.get('dataset', 'dataset')}::{candidate.get('surrogate_set', 'candidate')}::{candidate.get('rank_within_dataset', index)}")
         metadata = {"candidate_id": candidate_id, "candidate_dataset": candidate.get("dataset"),
                     "candidate_method": candidate.get("surrogate_set"),
-                    "candidate_rank": candidate.get("rank_within_dataset")}
+                    "candidate_rank": candidate.get("rank_within_dataset"),
+                    "candidate_selection_role": candidate.get("selection_role")}
         for item in candidate.get("attack_output_directories") or []:
             directory = Path(item).resolve(); directories.append(directory)
             prior = directory_metadata.get(str(directory))
@@ -327,6 +328,7 @@ def run_replay(config_path: Path, output_dirs: list[Path], result_dir: Path, *, 
                               "candidate_dataset": candidate.get("candidate_dataset"),
                               "candidate_method": candidate.get("candidate_method"),
                               "candidate_rank": candidate.get("candidate_rank"),
+                              "candidate_selection_role": candidate.get("candidate_selection_role"),
                               "item_id": item_id, "task_type": cfg.task_type, "provider": model.provider,
                               "model_id": model.model_id, "resolved_model_id": response_data.get("resolved_model_id"), "request_timestamp": datetime.now(timezone.utc).isoformat(),
                               "prompt": prompt, "prompt_hash": hashlib.sha256(prompt.encode()).hexdigest(), "image_sha256": image_hash, "condition": condition,
@@ -352,6 +354,7 @@ def run_replay(config_path: Path, output_dirs: list[Path], result_dir: Path, *, 
                 by_candidate_model[key] = {"candidate_id": candidate_id,
                     "candidate_dataset": subset[0].get("candidate_dataset"),
                     "candidate_method": subset[0].get("candidate_method"),
+                    "candidate_selection_role": subset[0].get("candidate_selection_role"),
                     "provider": model.provider, "model_id": model.model_id, **summarize(subset, cfg.bootstrap_samples)}
     combined = {"models": by_model, "candidate_models": by_candidate_model,
                 "macro_conditioned_asr": sum(v["conditioned_asr"] for v in by_model.values())/len(by_model) if by_model else 0,

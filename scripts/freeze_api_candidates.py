@@ -32,10 +32,13 @@ def read_rows(path: Path) -> list[dict[str, Any]]:
 
 
 def select_candidates(rows: list[dict[str, Any]], *, stage: str, budget_mode: str,
-                      top_k: int, minimum_seeds: int, minimum_targets: int = 1) -> list[dict[str, Any]]:
+                      top_k: int, minimum_seeds: int, minimum_targets: int = 1,
+                      datasets: set[str] | None = None, baseline: str | None = None) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         if row.get("stage") != stage or row.get("budget_mode") != budget_mode:
+            continue
+        if datasets is not None and str(row.get("dataset")) not in datasets:
             continue
         if int(row.get("missing_items", 0)) or int(row.get("valid_items", 0)) != int(row.get("items", -1)):
             continue
@@ -61,8 +64,18 @@ def select_candidates(rows: list[dict[str, Any]], *, stage: str, budget_mode: st
     selected = []
     for dataset, values in sorted(by_dataset.items()):
         values.sort(key=lambda row: (row["heldout_macro_asr"], row["heldout_macro_margin_gain"]), reverse=True)
-        for rank, value in enumerate(values[:top_k], 1):
-            selected.append({"rank_within_dataset": rank, **value})
+        if baseline is None:
+            chosen = values[:top_k]
+        else:
+            baseline_rows = [row for row in values if row["surrogate_set"] == baseline]
+            if not baseline_rows:
+                continue
+            alternatives = [row for row in values if row["surrogate_set"] != baseline]
+            chosen = [baseline_rows[0], *alternatives[:top_k]]
+        for rank, value in enumerate(chosen, 1):
+            selected.append({"rank_within_dataset": rank, "selection_role":
+                             "baseline" if baseline is not None and value["surrogate_set"] == baseline else "candidate",
+                             **value})
     return selected
 
 
@@ -78,22 +91,33 @@ def main() -> None:
     parser.add_argument("--analysis-csv", required=True)
     parser.add_argument("--stage", required=True)
     parser.add_argument("--budget-mode", required=True)
-    parser.add_argument("--top-k", type=int, default=2)
+    parser.add_argument("--top-k", type=int, default=2,
+                        help="Candidates per dataset; when --baseline is set, this excludes the baseline.")
     parser.add_argument("--minimum-seeds", type=int, default=3)
     parser.add_argument("--minimum-targets", type=int, default=1)
+    parser.add_argument("--dataset", action="append", default=[],
+                        help="Freeze only this dataset; repeat for multiple datasets. Prefer one task per manifest.")
+    parser.add_argument("--baseline", help="Always include this complete baseline before ranked candidates.")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     source = Path(args.analysis_csv)
     selected = select_candidates(read_rows(source), stage=args.stage, budget_mode=args.budget_mode,
                                  top_k=args.top_k, minimum_seeds=args.minimum_seeds,
-                                 minimum_targets=args.minimum_targets)
+                                 minimum_targets=args.minimum_targets,
+                                 datasets=set(args.dataset) if args.dataset else None,
+                                 baseline=args.baseline)
     if not selected:
         raise SystemExit("No complete held-out candidates satisfy the freeze criteria")
+    selected_datasets = {row["dataset"] for row in selected}
+    if args.dataset and selected_datasets != set(args.dataset):
+        missing = sorted(set(args.dataset) - selected_datasets)
+        raise SystemExit(f"No complete held-out candidates for requested datasets: {missing}")
     manifest = {"schema_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
         "selection_source": "heldout_open_source_only", "api_results_used_for_selection": False,
         "analysis_csv": str(source.resolve()), "analysis_csv_sha256": sha256(source),
         "stage": args.stage, "budget_mode": args.budget_mode, "top_k_per_dataset": args.top_k,
-        "minimum_seeds": args.minimum_seeds, "candidates": selected}
+        "minimum_seeds": args.minimum_seeds, "datasets": sorted(selected_datasets),
+        "baseline": args.baseline, "candidates": selected}
     manifest["minimum_targets"] = args.minimum_targets
     canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
     manifest["freeze_hash"] = hashlib.sha256(canonical).hexdigest()
