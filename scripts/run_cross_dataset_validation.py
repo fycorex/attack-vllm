@@ -126,6 +126,13 @@ def main() -> None:
         args.cache_dir,
     )
     validate_stage(validation_root, VALIDATION_STAGE, expected_validation)
+    subprocess.run([
+        args.python,
+        "scripts/analyze_surrogate_experiments.py",
+        "--root", str(validation_root),
+        "--output", str(validation_root / "analysis"),
+        "--bootstrap-samples", str(args.bootstrap_samples),
+    ], check=True)
     write_state(state, status="complete", **plan)
 
 
