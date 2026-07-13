@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 import csv
+from itertools import combinations
 import json
 from pathlib import Path
 import random
@@ -18,14 +20,111 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
-def _bootstrap_delta(pairs: list[tuple[bool, bool]], samples: int = 2000) -> tuple[float | None, list[float | None]]:
-    if not pairs:
+def _bootstrap_mean(values: list[float], samples: int = 2000) -> tuple[float | None, list[float | None]]:
+    if not values:
         return None, [None, None]
-    deltas = [float(candidate) - float(baseline) for baseline, candidate in pairs]
-    estimate = sum(deltas) / len(deltas)
+    estimate = sum(values) / len(values)
     rng = random.Random(0)
-    draws = sorted(sum(rng.choice(deltas) for _ in deltas) / len(deltas) for _ in range(samples))
+    draws = sorted(sum(rng.choice(values) for _ in values) / len(values) for _ in range(samples))
     return estimate, [draws[int(.025 * (len(draws) - 1))], draws[int(.975 * (len(draws) - 1))]]
+
+
+def _method_sort_key(name: str) -> tuple[int, str]:
+    preferred = {
+        "single_reference": 0,
+        "two_homogeneous": 1,
+        "incremental_three": 2,
+        "four_lightweight_mixed": 3,
+    }
+    return preferred.get(name, 100), name
+
+
+def paired_method_comparisons(
+    trials: list[dict[str, Any]], samples: int = 2000
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Compare every method pair and bootstrap item clusters across seeds/targets.
+
+    The same item is attacked under multiple seeds and evaluated on multiple
+    targets, so those observations are not independent. Aggregate intervals
+    resample item IDs and retain all seed/target observations within each item.
+    """
+    trial_groups: dict[tuple[str, str, int], list[dict[str, Any]]] = defaultdict(list)
+    for trial in trials:
+        trial_groups[(trial["stage"], trial["dataset"], int(trial["seed"]))].append(trial)
+
+    cell_rows: list[dict[str, Any]] = []
+    observations: list[dict[str, Any]] = []
+    for (stage, dataset, seed), group in sorted(trial_groups.items()):
+        ordered = sorted(group, key=lambda trial: _method_sort_key(trial["surrogate_set"]))
+        for baseline, candidate in combinations(ordered, 2):
+            baseline_targets = {model for model, _ in baseline["item_success"]}
+            candidate_targets = {model for model, _ in candidate["item_success"]}
+            for target in sorted(baseline_targets & candidate_targets):
+                baseline_ids = {item_id for model, item_id in baseline["item_success"] if model == target}
+                candidate_ids = {item_id for model, item_id in candidate["item_success"] if model == target}
+                paired_ids = sorted(baseline_ids & candidate_ids)
+                deltas = [
+                    float(candidate["item_success"][(target, item_id)])
+                    - float(baseline["item_success"][(target, item_id)])
+                    for item_id in paired_ids
+                ]
+                delta, interval = _bootstrap_mean(deltas, samples=samples)
+                cell_rows.append({
+                    "stage": stage,
+                    "dataset": dataset,
+                    "seed": seed,
+                    "target": target,
+                    "baseline": baseline["surrogate_set"],
+                    "candidate": candidate["surrogate_set"],
+                    "baseline_items": len(baseline_ids),
+                    "candidate_items": len(candidate_ids),
+                    "paired_items": len(paired_ids),
+                    "asr_delta": delta,
+                    "ci95_low": interval[0],
+                    "ci95_high": interval[1],
+                })
+                observations.extend({
+                    "stage": stage,
+                    "dataset": dataset,
+                    "seed": seed,
+                    "target": target,
+                    "baseline": baseline["surrogate_set"],
+                    "candidate": candidate["surrogate_set"],
+                    "item_id": item_id,
+                    "delta": item_delta,
+                } for item_id, item_delta in zip(paired_ids, deltas))
+
+    aggregate_rows: list[dict[str, Any]] = []
+    for scope in ("target", "macro_targets"):
+        grouped: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
+        for row in observations:
+            key = (row["stage"], row["dataset"], row["baseline"], row["candidate"])
+            if scope == "target":
+                key += (row["target"],)
+            grouped[key].append(row)
+        for key, group in sorted(grouped.items()):
+            item_clusters: dict[str, list[float]] = defaultdict(list)
+            for row in group:
+                item_clusters[row["item_id"]].append(row["delta"])
+            cluster_means = [sum(values) / len(values) for _, values in sorted(item_clusters.items())]
+            delta, interval = _bootstrap_mean(cluster_means, samples=samples)
+            stage, dataset, baseline, candidate, *target = key
+            aggregate_rows.append({
+                "scope": scope,
+                "stage": stage,
+                "dataset": dataset,
+                "target": target[0] if target else "__macro__",
+                "baseline": baseline,
+                "candidate": candidate,
+                "asr_delta": delta,
+                "ci95_low": interval[0],
+                "ci95_high": interval[1],
+                "seed_count": len({row["seed"] for row in group}),
+                "target_count": len({row["target"] for row in group}),
+                "unique_item_clusters": len(item_clusters),
+                "paired_observations": len(group),
+            })
+    return cell_rows, aggregate_rows
 
 
 def load_trials(root: Path) -> list[dict[str, Any]]:
@@ -48,6 +147,7 @@ def main() -> None:
     parser.add_argument("--root", default="outputs/surrogate_experiments")
     parser.add_argument("--output", default="outputs/surrogate_analysis")
     parser.add_argument("--theory-metrics", help="Optional Stage 0A ensemble_theory_metrics.csv")
+    parser.add_argument("--bootstrap-samples", type=int, default=2000)
     args = parser.parse_args()
     trials = load_trials(Path(args.root))
     output = Path(args.output)
@@ -64,21 +164,11 @@ def main() -> None:
     _write_csv(output / "incremental_proxy_addition.csv", [row for row in rows if row["surrogate_set"] in {"single_reference", "two_homogeneous", "incremental_three", "four_lightweight_mixed"}])
     _write_csv(output / "leave_one_out_results.csv", [row for row in rows if row["surrogate_set"].startswith("leave_out_")])
 
-    baseline = {(trial["stage"], trial["dataset"], trial["seed"]): trial for trial in trials if trial["surrogate_set"] == "single_reference"}
-    comparison_rows = []
-    for trial in trials:
-        reference = baseline.get((trial["stage"], trial["dataset"], trial["seed"]))
-        if reference is None or trial is reference:
-            continue
-        for target in trial["heldout"]["heldout_models"]:
-            item_ids = sorted({item_id for model, item_id in trial["item_success"] if model == target} |
-                              {item_id for model, item_id in reference["item_success"] if model == target})
-            pairs = [(reference["item_success"].get((target, item_id), False), trial["item_success"].get((target, item_id), False)) for item_id in item_ids]
-            delta, interval = _bootstrap_delta(pairs)
-            comparison_rows.append({"stage": trial["stage"], "dataset": trial["dataset"], "seed": trial["seed"],
-                                    "target": target, "baseline": "single_reference", "candidate": trial["surrogate_set"],
-                                    "paired_items": len(pairs), "asr_delta": delta, "ci95_low": interval[0], "ci95_high": interval[1]})
+    comparison_rows, aggregate_comparison_rows = paired_method_comparisons(
+        trials, samples=args.bootstrap_samples
+    )
     _write_csv(output / "paired_comparisons.csv", comparison_rows)
+    _write_csv(output / "aggregate_paired_comparisons.csv", aggregate_comparison_rows)
 
     theory_rows = []
     if args.theory_metrics:
@@ -100,11 +190,13 @@ def main() -> None:
         "No claim is classified from measurement-only CKA/EA values. Transfer classifications require completed paired attacks.",
         "",
         f"Paired ensemble-to-reference comparisons available: {len(comparison_rows)}.",
+        f"Clustered aggregate comparisons available: {len(aggregate_comparison_rows)}.",
         "",
         "API outcomes are not read by this analyzer.",
     ]
     (output / "ensemble_claim_summary.md").write_text("\n".join(claims) + "\n", encoding="utf-8")
-    print(json.dumps({"trials": len(trials), "result_rows": len(rows), "paired_comparisons": len(comparison_rows), "output": str(output)}, indent=2))
+    print(json.dumps({"trials": len(trials), "result_rows": len(rows), "paired_comparisons": len(comparison_rows),
+                      "aggregate_paired_comparisons": len(aggregate_comparison_rows), "output": str(output)}, indent=2))
 
 
 if __name__ == "__main__":
