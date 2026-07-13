@@ -91,6 +91,11 @@ def main() -> None:
         "--expected-trials", str(count),
         "--output", str(validation_dir),
     ], check=True)
+    subprocess.run([
+        args.python, "scripts/analyze_geometric_experiments.py",
+        "--root", args.root,
+        "--output", str(Path(args.validation_output) / "paired_analysis"),
+    ], check=True)
 
 
 if __name__ == "__main__":
