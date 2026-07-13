@@ -86,6 +86,32 @@ def atomic_json(path: Path, value: Any) -> None:
     temporary.replace(path)
 
 
+def freeze_manifest(source: Path, output: Path, *, stage: str, budget_mode: str,
+                    top_k: int = 1, minimum_seeds: int = 3, minimum_targets: int = 1,
+                    datasets: set[str] | None = None, baseline: str | None = None) -> dict[str, Any]:
+    selected = select_candidates(
+        read_rows(source), stage=stage, budget_mode=budget_mode, top_k=top_k,
+        minimum_seeds=minimum_seeds, minimum_targets=minimum_targets,
+        datasets=datasets, baseline=baseline,
+    )
+    if not selected:
+        raise ValueError("No complete held-out candidates satisfy the freeze criteria")
+    selected_datasets = {row["dataset"] for row in selected}
+    if datasets is not None and selected_datasets != datasets:
+        missing = sorted(datasets - selected_datasets)
+        raise ValueError(f"No complete held-out candidates for requested datasets: {missing}")
+    manifest = {"schema_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
+        "selection_source": "heldout_open_source_only", "api_results_used_for_selection": False,
+        "analysis_csv": str(source.resolve()), "analysis_csv_sha256": sha256(source),
+        "stage": stage, "budget_mode": budget_mode, "top_k_per_dataset": top_k,
+        "minimum_seeds": minimum_seeds, "datasets": sorted(selected_datasets),
+        "baseline": baseline, "candidates": selected, "minimum_targets": minimum_targets}
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest["freeze_hash"] = hashlib.sha256(canonical).hexdigest()
+    atomic_json(output, manifest)
+    return manifest
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Freeze API candidates selected only by held-out open-source results.")
     parser.add_argument("--analysis-csv", required=True)
@@ -101,28 +127,16 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     source = Path(args.analysis_csv)
-    selected = select_candidates(read_rows(source), stage=args.stage, budget_mode=args.budget_mode,
-                                 top_k=args.top_k, minimum_seeds=args.minimum_seeds,
-                                 minimum_targets=args.minimum_targets,
-                                 datasets=set(args.dataset) if args.dataset else None,
-                                 baseline=args.baseline)
-    if not selected:
-        raise SystemExit("No complete held-out candidates satisfy the freeze criteria")
-    selected_datasets = {row["dataset"] for row in selected}
-    if args.dataset and selected_datasets != set(args.dataset):
-        missing = sorted(set(args.dataset) - selected_datasets)
-        raise SystemExit(f"No complete held-out candidates for requested datasets: {missing}")
-    manifest = {"schema_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
-        "selection_source": "heldout_open_source_only", "api_results_used_for_selection": False,
-        "analysis_csv": str(source.resolve()), "analysis_csv_sha256": sha256(source),
-        "stage": args.stage, "budget_mode": args.budget_mode, "top_k_per_dataset": args.top_k,
-        "minimum_seeds": args.minimum_seeds, "datasets": sorted(selected_datasets),
-        "baseline": args.baseline, "candidates": selected}
-    manifest["minimum_targets"] = args.minimum_targets
-    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
-    manifest["freeze_hash"] = hashlib.sha256(canonical).hexdigest()
-    atomic_json(Path(args.output), manifest)
-    print(json.dumps({"candidates": len(selected), "freeze_hash": manifest["freeze_hash"], "output": args.output}, indent=2))
+    try:
+        manifest = freeze_manifest(
+            source, Path(args.output), stage=args.stage, budget_mode=args.budget_mode,
+            top_k=args.top_k, minimum_seeds=args.minimum_seeds,
+            minimum_targets=args.minimum_targets,
+            datasets=set(args.dataset) if args.dataset else None, baseline=args.baseline,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(json.dumps({"candidates": len(manifest["candidates"]), "freeze_hash": manifest["freeze_hash"], "output": args.output}, indent=2))
 
 
 if __name__ == "__main__":
