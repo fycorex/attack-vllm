@@ -53,3 +53,29 @@ def bootstrap_spearman(first: list[float], second: list[float], samples: int = 2
     draws.sort()
     interval = [draws[int(.025 * (len(draws) - 1))], draws[int(.975 * (len(draws) - 1))]] if draws else [None, None]
     return {"spearman": estimate, "ci95": interval, "pairs": len(first)}
+
+
+def clustered_bootstrap_spearman(first: list[float], second: list[float], cluster_ids: list[str],
+                                 samples: int = 2000, seed: int = 0) -> dict:
+    if not (len(first) == len(second) == len(cluster_ids)):
+        raise ValueError("first, second, and cluster_ids must have equal lengths")
+    estimate = spearman(first, second)
+    clusters: dict[str, list[int]] = {}
+    for index, cluster_id in enumerate(cluster_ids):
+        clusters.setdefault(str(cluster_id), []).append(index)
+    cluster_names = sorted(clusters)
+    if estimate is None or len(cluster_names) < 3:
+        return {"spearman": estimate, "ci95": [None, None], "pairs": len(first),
+                "clusters": len(cluster_names)}
+    rng = random.Random(seed)
+    draws = []
+    for _ in range(samples):
+        sampled_clusters = [rng.choice(cluster_names) for _ in cluster_names]
+        indices = [index for name in sampled_clusters for index in clusters[name]]
+        value = spearman([first[index] for index in indices], [second[index] for index in indices])
+        if value is not None:
+            draws.append(value)
+    draws.sort()
+    interval = [draws[int(.025 * (len(draws) - 1))], draws[int(.975 * (len(draws) - 1))]] if draws else [None, None]
+    return {"spearman": estimate, "ci95": interval, "pairs": len(first),
+            "clusters": len(cluster_names)}

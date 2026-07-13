@@ -1,6 +1,6 @@
 import unittest
 
-from alignment_analysis import average_ranks, bootstrap_spearman, spearman
+from alignment_analysis import average_ranks, bootstrap_spearman, clustered_bootstrap_spearman, spearman
 
 
 class AlignmentAnalysisTests(unittest.TestCase):
@@ -15,6 +15,19 @@ class AlignmentAnalysisTests(unittest.TestCase):
         result = bootstrap_spearman([1, 2], [2, 3])
         self.assertEqual(result["pairs"], 2)
         self.assertEqual(result["ci95"], [None, None])
+
+    def test_clustered_bootstrap_resamples_unique_items(self):
+        first = [1, 1, 2, 2, 3, 3]
+        second = [10, 11, 20, 21, 30, 31]
+        clusters = ["a", "a", "b", "b", "c", "c"]
+        result = clustered_bootstrap_spearman(first, second, clusters, samples=100)
+        self.assertEqual(result["pairs"], 6)
+        self.assertEqual(result["clusters"], 3)
+        self.assertAlmostEqual(result["spearman"], 0.9561828874675149)
+
+    def test_clustered_bootstrap_rejects_mismatched_lengths(self):
+        with self.assertRaisesRegex(ValueError, "equal lengths"):
+            clustered_bootstrap_spearman([1], [2], [])
 
 
 if __name__ == "__main__":

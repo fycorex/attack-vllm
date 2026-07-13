@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from alignment_analysis import bootstrap_spearman, spearman
+from alignment_analysis import bootstrap_spearman, clustered_bootstrap_spearman, spearman
 
 
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -165,7 +165,12 @@ def main() -> None:
     for predictor, outcome in (("delta_dproxy", "delta_dtarget"), ("delta_dproxy", "target_success"),
                                ("delta_dtarget", "target_success")):
         valid = [row for row in item_rows if isinstance(row.get(predictor), (int, float)) and isinstance(row.get(outcome), (int, float, bool))]
-        result = bootstrap_spearman([float(row[predictor]) for row in valid], [float(row[outcome]) for row in valid], samples=args.bootstrap_samples)
+        result = clustered_bootstrap_spearman(
+            [float(row[predictor]) for row in valid],
+            [float(row[outcome]) for row in valid],
+            [f"{row['dataset']}::{row['item_id']}" for row in valid],
+            samples=args.bootstrap_samples,
+        )
         distance_correlations.append({"predictor": predictor, "outcome": outcome, **result})
     successes = [row for row in distance_valid if row["target_success"]]
     failures = [row for row in distance_valid if not row["target_success"]]
