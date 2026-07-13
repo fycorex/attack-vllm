@@ -45,7 +45,7 @@ def _single_set_map(composition_path: Path) -> tuple[dict[str, str], dict[str, d
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Join reusable single-proxy outputs with Sections 5--6 alignment metrics.")
+    parser = argparse.ArgumentParser(description="Join reusable single-proxy outputs with encoder-alignment metrics.")
     parser.add_argument("--surrogate-results-root", required=True)
     parser.add_argument("--composition-config", required=True)
     parser.add_argument("--alignment-metrics", nargs="+", type=Path)
@@ -222,7 +222,7 @@ def main() -> None:
     _write_csv(output / "family_stratified_transfer.csv", family_rows)
     _write_csv(output / "alignment_sample_sensitivity.csv", sensitivity_rows)
     (output / "distance_summary.json").write_text(json.dumps(distance_summary, indent=2), encoding="utf-8")
-    summary = ["# Sections 5--6 Claim Summary", "", f"Joined item rows: {len(item_rows)}.", f"Proxy--target pairs: {len(pair_rows)}.", "",
+    summary = ["# Encoder Alignment Claim Summary", "", f"Joined item rows: {len(item_rows)}.", f"Proxy--target pairs: {len(pair_rows)}.", "",
                "Claims remain not identifiable when the single-proxy matrix is absent or too small.",
                "No proprietary architecture assumptions or API selection are used."]
     (output / "alignment_claim_summary.md").write_text("\n".join(summary) + "\n", encoding="utf-8")
