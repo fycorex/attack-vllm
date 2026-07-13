@@ -1,0 +1,16 @@
+experiment_name: transferability-final-confirmation
+task_type: caption
+caption_prompt: Provide a concise description of the image using no more than three sentences.
+models:
+  - provider: openai
+    model_id: gpt-5.6-sol
+    api_key_env: OPENAI_API_KEY
+    max_output_tokens: 64
+  - provider: gemini
+    model_id: gemini-2.5-pro
+    api_key_env: GEMINI_API_KEY
+    max_output_tokens: 64
+  - provider: anthropic
+    model_id: claude-opus-4-8
+    api_key_env: ANTHROPIC_API_KEY
+    max_output_tokens: 64
