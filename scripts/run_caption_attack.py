@@ -18,6 +18,7 @@ def main() -> None:
         default=None,
         help="Optional runtime profile: light for smoke runs, heavy for A6000-class ensembles, api for live API transfer evaluation.",
     )
+    parser.add_argument("--output-dir", help="Optional isolated output directory override.")
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -65,6 +66,8 @@ def main() -> None:
         default=None,
         help="Optional attack-history metric interval. Higher values reduce CUDA synchronization overhead.",
     )
+    parser.add_argument("--attack-batch-size", type=int,
+                        help="Number of independent items optimized in one GPU batch for replay-only runs.")
     parser.add_argument(
         "--parallel_surrogates",
         action="store_true",
@@ -86,6 +89,9 @@ def main() -> None:
     config = load_config(args.config)
     apply_profile(config, args.profile)
     cli_overrides = {}
+    if args.output_dir is not None:
+        config.paths.output_dir = args.output_dir
+        cli_overrides["paths.output_dir"] = args.output_dir
     if args.attack_limit is not None:
         config.runtime.attack_limit = args.attack_limit
         cli_overrides["runtime.attack_limit"] = args.attack_limit
@@ -107,6 +113,9 @@ def main() -> None:
     if args.metrics_interval is not None:
         config.attack.metrics_interval = args.metrics_interval
         cli_overrides["attack.metrics_interval"] = args.metrics_interval
+    if args.attack_batch_size is not None:
+        config.runtime.attack_batch_size = args.attack_batch_size
+        cli_overrides["runtime.attack_batch_size"] = args.attack_batch_size
     if args.parallel_surrogates:
         config.runtime.sequential_surrogates = False
         cli_overrides["runtime.sequential_surrogates"] = False

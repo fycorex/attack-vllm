@@ -13,7 +13,7 @@ mkdir -p "$OUTPUT"
 set +e
 PYTHONPATH="$ROOT/src:$ROOT" TECHUTOPIA_API_KEY="${TECHUTOPIA_API_KEY:-research-cycle}" \
   "$PYTHON" "$ROOT/scripts/run_transfer_search_cycle.py" \
-  --hours 8 --gpu-jobs 8 --heldout-batch-size 64 --augmentation-workers 2 --promote 3 --run-api \
+  --hours 8 --gpu-jobs 6 --heldout-batch-size 64 --augmentation-workers 2 --promote 3 --run-api \
   --output "$OUTPUT" \
   >"$OUTPUT/launcher.log" 2>&1
 CYCLE_EXIT=$?

@@ -66,6 +66,7 @@ class RuntimeConfig:
     sequential_surrogates: bool = True
     enable_tf32: bool = True
     cudnn_benchmark: bool = True
+    attack_batch_size: int = 1
 
 
 @dataclass

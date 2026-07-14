@@ -132,7 +132,9 @@ def build_attack_config(base: dict, experiment: dict, composition: CompositionSp
     value["experiment_name"] = f"surrogate-{trial['trial_id']}"
     value["paths"]["manifest"] = dataset["manifest"]
     value["paths"]["output_dir"] = str(output / "attack")
-    value["runtime"].update({"seed": trial["seed"], "attack_limit": trial["items"], "attack_offset": 0, "sequential_surrogates": False})
+    value["runtime"].update({"seed": trial["seed"], "attack_limit": trial["items"], "attack_offset": 0,
+                             "sequential_surrogates": False,
+                             "attack_batch_size": int(dataset.get("attack_batch_size", 1))})
     if device is not None:
         value["runtime"]["device"] = device
     value["attack"].update({"steps": trial["steps"], "metrics_interval": max(1, trial["steps"] // 10)})

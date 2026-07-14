@@ -18,6 +18,7 @@ from theory_metrics import (
 )
 from scripts.measure_surrogate_geometry import subsample_indices
 from config import SurrogateConfig
+from losses import batched_visual_contrastive_loss, visual_contrastive_loss
 from surrogates import Dinov2Wrapper
 
 
@@ -32,6 +33,22 @@ class _ToyDino(torch.nn.Module):
 
 
 class SurrogateTheoryTests(unittest.TestCase):
+    def test_batched_attack_loss_matches_independent_item_mean(self):
+        torch.manual_seed(7)
+        batch, augmentations, positives, negatives, dimensions = 3, 2, 5, 4, 8
+        images = torch.nn.functional.normalize(torch.randn(augmentations, batch, dimensions), dim=-1)
+        positive = torch.nn.functional.normalize(torch.randn(batch, positives, dimensions), dim=-1)
+        negative = torch.nn.functional.normalize(torch.randn(batch, negatives, dimensions), dim=-1)
+        batched, _ = batched_visual_contrastive_loss(images, positive, negative, .1, 3, False)
+        independent = []
+        for augmentation in range(augmentations):
+            for item in range(batch):
+                value, _ = visual_contrastive_loss(
+                    images[augmentation, item:item + 1], positive[item], negative[item], .1, 3, False,
+                )
+                independent.append(value)
+        self.assertTrue(torch.allclose(batched, torch.stack(independent).mean(), atol=1e-6))
+
     def test_config_resolves_exact_sets_and_metadata(self):
         spec = load_composition_spec("configs/surrogate_composition.yaml")
         resolved = spec.resolve("two_homogeneous")

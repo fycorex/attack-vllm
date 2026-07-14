@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import json
 import random
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import torch
@@ -15,7 +17,8 @@ from caption_victim import CaptionVictim
 from config import AttackConfig, config_to_dict, enabled_surrogate_names, load_config
 from data import AttackItem, load_image_tensor, load_manifest, normalize_image_size, save_tensor_image, tensor_to_pil_image
 from eval import evaluate_proxy, summarize_results, write_item_csv
-from losses import relative_proxy_loss, visual_contrastive_loss
+from losses import (batched_relative_proxy_loss, batched_visual_contrastive_loss,
+                    relative_proxy_loss, visual_contrastive_loss)
 from ocr_victim import OCRVictim
 from gpt_victim import GPTVictim
 from ollama_victim import OllamaVictim
@@ -169,6 +172,65 @@ class CaptionAttackRunner:
             if self.config.runtime.sequential_surrogates:
                 unload_surrogate(surrogate)
         return example_cache
+
+    def _precompute_batch_example_embeddings(self, items: list[AttackItem], encode_batch_size: int = 64) -> list[dict]:
+        """Precompute item references by model-wide batches instead of 100-image microbatches.
+
+        Each item still receives exactly its own positive, negative, and clean
+        embeddings.  Only independent image encodes are packed together.
+        """
+        caches = [{} for _ in items]
+        for surrogate in self.surrogates:
+            size = surrogate.config.input_size
+            paths = []
+            seen = set()
+            for item in items:
+                for path in [*item.positive_image_paths, *item.negative_image_paths, item.image_path]:
+                    key = str(path)
+                    if key not in seen:
+                        seen.add(key)
+                        paths.append(path)
+            fingerprint = hashlib.sha256(json.dumps({
+                "model": surrogate.name,
+                "input_size": size,
+                "paths": [(str(path), path.stat().st_size, path.stat().st_mtime_ns) for path in paths],
+            }, sort_keys=True).encode()).hexdigest()
+            cache_dir = self.model_cache_dir / "reference_embeddings"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_path = cache_dir / f"{fingerprint}.pt"
+            if cache_path.is_file():
+                payload = torch.load(cache_path, map_location="cpu", weights_only=False)
+                embeddings = list(payload["embeddings"])
+            else:
+                path_batches = [paths[offset:offset + encode_batch_size]
+                                for offset in range(0, len(paths), encode_batch_size)]
+
+                def load_path_batch(path_batch: list[Path]) -> torch.Tensor:
+                    with ThreadPoolExecutor(max_workers=8) as loaders:
+                        return torch.stack(list(loaders.map(lambda path: load_image_tensor(path, size), path_batch))).pin_memory()
+
+                embeddings = []
+                with ThreadPoolExecutor(max_workers=2) as prefetch:
+                    futures = [prefetch.submit(load_path_batch, path_batch) for path_batch in path_batches[:2]]
+                    next_index = len(futures)
+                    with torch.no_grad():
+                        for batch_index in range(len(path_batches)):
+                            image_batch = futures.pop(0).result().to(self.device, non_blocking=True)
+                            if next_index < len(path_batches):
+                                futures.append(prefetch.submit(load_path_batch, path_batches[next_index]))
+                                next_index += 1
+                            embeddings.extend(surrogate.encode_image(image_batch).cpu())
+                temporary = cache_path.with_suffix(".tmp")
+                torch.save({"embeddings": torch.stack(embeddings)}, temporary)
+                temporary.replace(cache_path)
+            by_path = {str(path): embedding for path, embedding in zip(paths, embeddings)}
+            for cache, item in zip(caches, items):
+                cache[surrogate.name] = {
+                    "positive_embeddings": torch.stack([by_path[str(path)] for path in item.positive_image_paths]),
+                    "negative_embeddings": torch.stack([by_path[str(path)] for path in item.negative_image_paths]),
+                    "clean_embedding": by_path[str(item.image_path)].unsqueeze(0),
+                }
+        return caches
 
     def _ensemble_proxy_eval(self, clean: torch.Tensor, adv: torch.Tensor, example_cache: dict) -> dict:
         per_surrogate = {}
@@ -440,6 +502,103 @@ class CaptionAttackRunner:
         (item_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
         return result
 
+    def attack_items_batch(self, items: list[AttackItem]) -> list[dict]:
+        """Optimize independent item perturbations together to fill the GPU.
+
+        This path is limited to replay-style research runs where local/API
+        victims are disabled.  Its objective is the mean of the unchanged
+        per-item objectives; item perturbations do not share gradients.
+        """
+        if len(items) == 1:
+            return [self.attack_item(items[0])]
+        if any((self.caption_victim, self.vqa_victim, self.ocr_victim, self.gpt_victim,
+                self.ollama_victim, self.qwen_vl_victim)):
+            return [self.attack_item(item) for item in items]
+        if len({(len(item.positive_image_paths), len(item.negative_image_paths)) for item in items}) != 1:
+            return [self.attack_item(item) for item in items]
+        started_at = time.monotonic()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+        example_caches = self._precompute_batch_example_embeddings(items)
+        base_size = self._base_attack_size()
+        clean = torch.stack([load_image_tensor(item.image_path, base_size) for item in items]).to(self.device)
+        delta = torch.zeros_like(clean, requires_grad=True)
+        delta_ema = torch.zeros_like(clean)
+        pipelines = {surrogate.config.input_size: AttackAugmentationPipeline(self.config.attack, surrogate.config.input_size)
+                     for surrogate in self.surrogates}
+        augmentation_batches = max(1, int(self.config.attack.augmentation_batches))
+        augmentation_forward_batch_size = max(1, int(self.config.attack.augmentation_forward_batch_size))
+        patch_drop_rate = self.config.attack.patch_drop_rate if self.config.attack.enable_patch_drop else 0.0
+        drop_path_max_rate = self.config.attack.drop_path_max_rate if self.config.attack.enable_drop_path else 0.0
+        history = []
+        for step in tqdm(range(self.config.attack.steps), desc=f"attack-batch:{len(items)}", leave=False):
+            collect = _should_collect_step_metrics(step, self.config.attack.steps, int(self.config.attack.metrics_interval))
+            if delta.grad is not None:
+                delta.grad.zero_()
+            step_loss = 0.0
+            for surrogate in self.surrogates:
+                positives = torch.stack([cache[surrogate.name]["positive_embeddings"] for cache in example_caches]).to(self.device)
+                negatives = torch.stack([cache[surrogate.name]["negative_embeddings"] for cache in example_caches]).to(self.device)
+                clean_reference = torch.cat([cache[surrogate.name]["clean_embedding"] for cache in example_caches]).to(self.device)
+                for aug_start in range(0, augmentation_batches, augmentation_forward_batch_size):
+                    current = min(augmentation_forward_batch_size, augmentation_batches - aug_start)
+                    adv = (clean + delta.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)).clamp(0.0, 1.0)
+                    surrogate_input = self._resize_for_surrogate(adv, surrogate.config.input_size)
+                    augmented = self._augment_for_surrogate(pipelines[surrogate.config.input_size], surrogate_input, current)
+                    embeddings = surrogate.encode_image(augmented, patch_drop_rate=patch_drop_rate,
+                                                        drop_path_max_rate=drop_path_max_rate).reshape(current, len(items), -1)
+                    loss, _ = batched_visual_contrastive_loss(embeddings, positives, negatives,
+                                                              self.config.attack.temperature, self.config.attack.top_k, collect)
+                    if self.config.attack.relative_proxy_weight > 0.0:
+                        relative_loss, _ = batched_relative_proxy_loss(clean_reference, embeddings, positives, negatives,
+                                                                         self.config.attack.top_k, collect)
+                        loss = loss + self.config.attack.relative_proxy_weight * relative_loss
+                    weight = float(current) / float(augmentation_batches)
+                    (loss * weight).backward()
+                    if collect:
+                        step_loss += float(loss.detach().cpu()) * weight
+            if delta.grad is None:
+                raise RuntimeError("Batched attack step produced no gradient.")
+            with torch.no_grad():
+                delta.sub_(self.config.attack.step_size * delta.grad.sign())
+                delta.clamp_(-self.config.attack.epsilon, self.config.attack.epsilon)
+                delta.copy_((clean + delta).clamp(0.0, 1.0) - clean)
+                if self.config.attack.enable_perturbation_ema:
+                    delta_ema.mul_(self.config.attack.perturbation_ema_decay).add_(delta.detach() * (1.0 - self.config.attack.perturbation_ema_decay))
+                else:
+                    delta_ema.copy_(delta.detach())
+            if collect:
+                history.append({"step": step, "loss": step_loss, "batch_size": len(items),
+                                "surrogate_forwards": len(self.surrogates) * augmentation_batches})
+
+        final_adv = (clean + delta_ema.clamp(-self.config.attack.epsilon, self.config.attack.epsilon)).clamp(0.0, 1.0)
+        results = []
+        for index, item in enumerate(items):
+            item_clean, item_adv, item_delta = clean[index:index + 1], final_adv[index:index + 1], delta_ema[index:index + 1]
+            proxy_eval = self._ensemble_proxy_eval(item_clean, item_adv, example_caches[index])
+            item_dir = self.output_dir / item.item_id
+            item_dir.mkdir(parents=True, exist_ok=True)
+            save_tensor_image(item_clean[0], item_dir / "clean.png")
+            save_tensor_image(item_adv[0], item_dir / "adversarial.png")
+            save_tensor_image(((item_delta[0] / (2.0 * self.config.attack.epsilon)) + 0.5).clamp(0.0, 1.0), item_dir / "delta_vis.png")
+            result = {
+                "item_id": item.item_id, "image_path": str(item.image_path), "source_label": item.source_label,
+                "target_label": item.target_label, "source_keywords": item.source_keywords, "target_keywords": item.target_keywords,
+                "question": item.question, "source_answer_text": item.source_answer_text, "target_answer_text": item.target_answer_text,
+                "source_answer_keywords": item.source_answer_keywords, "target_answer_keywords": item.target_answer_keywords,
+                "source_text_keywords": item.source_text_keywords, "target_text_keywords": item.target_text_keywords,
+                "metadata": item.metadata, "proxy_eval": proxy_eval,
+                "caption_eval": None, "vqa_eval": None, "ocr_eval": None, "gpt_eval": None, "ollama_eval": None, "qwen_vl_eval": None,
+                "history": history,
+                "composition_diagnostics": {"method": "equal_loss_mean", "surrogate_count": len(self.surrogates),
+                    "total_surrogate_forwards": len(self.surrogates) * augmentation_batches * self.config.attack.steps,
+                    "elapsed_seconds": time.monotonic() - started_at, "peak_cuda_memory_bytes": torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0,
+                    "attack_batch_size": len(items)},
+            }
+            (item_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+            results.append(result)
+        return results
+
     def run(self) -> dict:
         manifest = load_manifest(self.config.paths.manifest)
         self._write_effective_config()
@@ -447,7 +606,9 @@ class CaptionAttackRunner:
         items = manifest.items[self.config.runtime.attack_offset :]
         if self.config.runtime.attack_limit is not None:
             items = items[: self.config.runtime.attack_limit]
-        results = [self.attack_item(item) for item in items]
+        batch_size = max(1, int(self.config.runtime.attack_batch_size))
+        results = [result for offset in range(0, len(items), batch_size)
+                   for result in self.attack_items_batch(items[offset:offset + batch_size])]
         summary_metrics = summarize_results(results)
         summary = {
             "experiment_name": self.config.experiment_name,
@@ -459,6 +620,7 @@ class CaptionAttackRunner:
                 "enabled_surrogate_count": len(enabled_surrogate_names(self.config)),
                 "enabled_surrogates": enabled_surrogate_names(self.config),
                 "sequential_surrogates": self.config.runtime.sequential_surrogates,
+                "attack_batch_size": batch_size,
             },
             **summary_metrics,
             "items": results,

@@ -6,14 +6,17 @@ datasets:
     base_attack_config: configs/caption_attack_paper_eps8.yaml
     manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-noise/data/caltech_large/manifest.json
     augmentation_samples_per_step: 4
+    attack_batch_size: 16
   llava_vqa:
     base_attack_config: configs/llava_bench_vqa_eps16.yaml
     manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-geometric/outputs/prepared_datasets/llava_vqa_independent20/manifest.json
     augmentation_samples_per_step: 4
+    attack_batch_size: 16
   receipt_ocr:
     base_attack_config: configs/receipt_text_eps16.yaml
     manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-geometric/outputs/prepared_datasets/receipt_independent_balanced19/manifest.json
     augmentation_samples_per_step: 4
+    attack_batch_size: 16
 
 stages:
   cross_family_screen:

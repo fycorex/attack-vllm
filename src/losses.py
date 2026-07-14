@@ -34,6 +34,39 @@ def visual_contrastive_loss(
     return loss, metrics
 
 
+def batched_visual_contrastive_loss(
+    image_embeddings: torch.Tensor,
+    positive_embeddings: torch.Tensor,
+    negative_embeddings: torch.Tensor,
+    temperature: float,
+    top_k: int,
+    collect_metrics: bool = True,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    """Independent contrastive losses for a batch of attacked items.
+
+    ``image_embeddings`` is ``[augmentation, item, dim]`` while reference
+    embeddings are item-specific ``[item, reference, dim]``.  Averaging this
+    loss is mathematically the same objective as processing each item alone;
+    the batch dimension only improves accelerator utilization.
+    """
+    positive_logits = torch.einsum("abd,bpd->abp", image_embeddings, positive_embeddings)
+    negative_logits = torch.einsum("abd,bnd->abn", image_embeddings, negative_embeddings)
+    all_logits = torch.cat([positive_logits, negative_logits], dim=-1) / temperature
+    log_probs = torch.log_softmax(all_logits, dim=-1)
+    pos_log_probs = log_probs[..., :positive_embeddings.shape[1]]
+    neg_log_probs = log_probs[..., positive_embeddings.shape[1]:]
+    k = max(1, min(top_k, positive_embeddings.shape[1]))
+    topk_positive = torch.topk(pos_log_probs, k=k, dim=-1).values
+    loss = -topk_positive.mean() + neg_log_probs.mean()
+    if not collect_metrics:
+        return loss, {}
+    return loss, {
+        "positive_logprob_mean": float(pos_log_probs.mean().detach().cpu()),
+        "negative_logprob_mean": float(neg_log_probs.mean().detach().cpu()),
+        "topk_positive_logprob_mean": float(topk_positive.mean().detach().cpu()),
+    }
+
+
 def relative_proxy_loss(
     clean_image_embeddings: torch.Tensor,
     adversarial_image_embeddings: torch.Tensor,
@@ -61,3 +94,28 @@ def relative_proxy_loss(
         "relative_negative_shift": float(negative_shift.detach().cpu()),
     }
     return loss, metrics
+
+
+def batched_relative_proxy_loss(
+    clean_image_embeddings: torch.Tensor,
+    adversarial_image_embeddings: torch.Tensor,
+    positive_embeddings: torch.Tensor,
+    negative_embeddings: torch.Tensor,
+    top_k: int,
+    collect_metrics: bool = True,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    clean = clean_image_embeddings.unsqueeze(0)
+    clean_positive = torch.einsum("abd,bpd->abp", clean, positive_embeddings)
+    clean_negative = torch.einsum("abd,bnd->abn", clean, negative_embeddings)
+    adversarial_positive = torch.einsum("abd,bpd->abp", adversarial_image_embeddings, positive_embeddings)
+    adversarial_negative = torch.einsum("abd,bnd->abn", adversarial_image_embeddings, negative_embeddings)
+    k = max(1, min(top_k, positive_embeddings.shape[1]))
+    clean_topk = torch.topk(clean_positive, k=k, dim=-1).values
+    adversarial_topk = torch.topk(adversarial_positive, k=k, dim=-1).values
+    positive_gain = adversarial_topk.mean() - clean_topk.mean()
+    negative_shift = adversarial_negative.mean() - clean_negative.mean()
+    loss = -positive_gain + negative_shift
+    if not collect_metrics:
+        return loss, {}
+    return loss, {"relative_positive_gain": float(positive_gain.detach().cpu()),
+                  "relative_negative_shift": float(negative_shift.detach().cpu())}

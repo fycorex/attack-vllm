@@ -4,6 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from collections import deque
+import time
 
 import torch
 
@@ -25,30 +28,42 @@ def _batches(values: list, batch_size: int):
         yield values[offset:offset + batch_size]
 
 
-def _encode_batch(
-    wrapper,
-    batch: list,
-    size: int,
-    device: str,
-    top_k: int,
-) -> list[dict]:
-    """Evaluate equally-shaped image groups with four batched encoder forwards.
-
-    Metric computation remains per item.  Only independent image encodes are
-    combined, so this changes throughput rather than evaluation semantics.
-    """
-    clean = torch.stack([load_image_tensor(entry[1] / "clean.png", size) for entry in batch]).to(device)
-    adversarial = torch.stack([load_image_tensor(entry[1] / "adversarial.png", size) for entry in batch]).to(device)
+def _prepare_batch(batch: list, size: int, loader_workers: int = 1) -> tuple[list, tuple[torch.Tensor, ...], float]:
+    """Decode/resize a real image batch on CPU, optionally in parallel."""
+    started = time.perf_counter()
+    requests: list[tuple[str, Path]] = []
+    for item, item_dir in batch:
+        requests.extend([("clean", item_dir / "clean.png"), ("adversarial", item_dir / "adversarial.png")])
+        requests.extend([("positive", path) for path in item.positive_image_paths])
+        requests.extend([("negative", path) for path in item.negative_image_paths])
+    if loader_workers > 1:
+        with ThreadPoolExecutor(max_workers=loader_workers) as pool:
+            tensors = list(pool.map(lambda request: load_image_tensor(request[1], size), requests))
+    else:
+        tensors = [load_image_tensor(path, size) for _, path in requests]
     positive_counts = len(batch[0][0].positive_image_paths)
     negative_counts = len(batch[0][0].negative_image_paths)
-    positives = torch.stack([
-        torch.stack([load_image_tensor(path, size) for path in item.positive_image_paths])
-        for item, _ in batch
-    ]).to(device)
-    negatives = torch.stack([
-        torch.stack([load_image_tensor(path, size) for path in item.negative_image_paths])
-        for item, _ in batch
-    ]).to(device)
+    stride = positive_counts + negative_counts + 2
+    clean = torch.stack([tensors[index * stride] for index in range(len(batch))])
+    adversarial = torch.stack([tensors[index * stride + 1] for index in range(len(batch))])
+    positives = torch.stack([torch.stack(tensors[index * stride + 2:index * stride + 2 + positive_counts])
+                             for index in range(len(batch))])
+    negatives = torch.stack([torch.stack(tensors[index * stride + 2 + positive_counts:index * stride + stride])
+                             for index in range(len(batch))])
+    tensors_out = (clean, adversarial, positives, negatives)
+    if torch.cuda.is_available():
+        tensors_out = tuple(tensor.pin_memory() for tensor in tensors_out)
+    return batch, tensors_out, time.perf_counter() - started
+
+
+def _score_prepared_batch(
+    wrapper, batch: list, tensors: tuple[torch.Tensor, ...], device: str, top_k: int,
+) -> tuple[list[dict], float]:
+    """Run four real image groups on GPU after CPU-side prefetch has completed."""
+    clean, adversarial, positives, negatives = (tensor.to(device, non_blocking=True) for tensor in tensors)
+    positive_counts = positives.shape[1]
+    negative_counts = negatives.shape[1]
+    started = time.perf_counter()
     with torch.inference_mode():
         clean_embeddings = wrapper.encode_image(clean)
         adversarial_embeddings = wrapper.encode_image(adversarial)
@@ -76,7 +91,33 @@ def _encode_batch(
             "prototype_distance_change": float(adversarial_distance - clean_distance),
             **result,
         })
+    return rows, time.perf_counter() - started
+
+
+def _encode_batch(wrapper, batch: list, size: int, device: str, top_k: int) -> list[dict]:
+    """Compatibility wrapper for callers that do not use stage-level prefetch."""
+    prepared_batch, tensors, _ = _prepare_batch(batch, size)
+    rows, _ = _score_prepared_batch(wrapper, prepared_batch, tensors, device, top_k)
     return rows
+
+
+def prefetched_batches(batches, size: int, prefetch_batches: int, loader_workers: int):
+    """Overlap real PNG decode/resize of future batches with current GPU work."""
+    iterator = iter(batches)
+    queue = deque()
+    with ThreadPoolExecutor(max_workers=max(1, prefetch_batches)) as pool:
+        for _ in range(max(1, prefetch_batches)):
+            try:
+                queue.append(pool.submit(_prepare_batch, next(iterator), size, loader_workers))
+            except StopIteration:
+                break
+        while queue:
+            future = queue.popleft()
+            yield future.result()
+            try:
+                queue.append(pool.submit(_prepare_batch, next(iterator), size, loader_workers))
+            except StopIteration:
+                pass
 
 
 def summarize_rows(rows: list[dict], model_ids: list[str]) -> dict:

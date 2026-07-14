@@ -11,12 +11,13 @@ import argparse
 import json
 from collections import defaultdict
 from pathlib import Path
+import time
 
 import torch
 
 from config import SurrogateConfig
 from data import load_manifest
-from evaluate_surrogate_heldout import _batches, _encode_batch, summarize_rows
+from evaluate_surrogate_heldout import _batches, _score_prepared_batch, prefetched_batches, summarize_rows
 from surrogate_composition import load_composition_spec
 from surrogates import create_surrogate, unload_surrogate
 from transfer_eval import atomic_write_json
@@ -38,6 +39,9 @@ def main() -> None:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--cache-dir", default="models/open_clip")
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--prefetch-batches", type=int, default=2)
+    parser.add_argument("--loader-workers", type=int, default=8)
+    parser.add_argument("--profile-output", help="Write CPU decode and GPU-batch timing for a real replay run.")
     args = parser.parse_args()
     if args.batch_size < 1:
         raise ValueError("--batch-size must be positive")
@@ -49,6 +53,7 @@ def main() -> None:
         return
     device = args.device if torch.cuda.is_available() else "cpu"
     rows_by_trial: dict[Path, list[dict]] = defaultdict(list)
+    timing_rows = []
 
     records_by_shape: dict[tuple[int, int], list[tuple[dict, object, Path]]] = defaultdict(list)
     for trial in pending:
@@ -70,11 +75,14 @@ def main() -> None:
         wrapper = create_surrogate(SurrogateConfig(**metadata.victim_config()), device, cache_dir=args.cache_dir)
         try:
             for records in records_by_shape.values():
-                for batch in _batches(records, args.batch_size):
-                    encoded = _encode_batch(
-                        wrapper, [(item, item_dir) for _, item, item_dir in batch],
-                        metadata.input_size, device, top_k=10,
-                    )
+                batches = ([ (item, item_dir) for _, item, item_dir in batch ]
+                           for batch in _batches(records, args.batch_size))
+                for batch, tensors, cpu_seconds in prefetched_batches(
+                    batches, metadata.input_size, args.prefetch_batches, args.loader_workers,
+                ):
+                    encoded, gpu_wall_seconds = _score_prepared_batch(wrapper, batch, tensors, device, top_k=10)
+                    timing_rows.append({"model": model_id, "items": len(batch), "cpu_prepare_seconds": cpu_seconds,
+                                        "gpu_batch_wall_seconds": gpu_wall_seconds})
                     for (trial, _, _), row in zip(batch, encoded):
                         rows_by_trial[trial["directory"]].append({"model": model_id, **row})
         finally:
@@ -94,6 +102,8 @@ def main() -> None:
         completed += 1
     print(json.dumps({"pending_trials": len(pending), "completed_trials": completed,
                       "models_loaded_once_each": len(spec.heldout_models), "batch_size": args.batch_size}, indent=2))
+    if args.profile_output:
+        Path(args.profile_output).write_text(json.dumps({"batches": timing_rows}, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":
