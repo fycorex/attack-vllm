@@ -76,7 +76,7 @@ def run_bounded_stage(
                 sys.executable, "scripts/run_surrogate_experiments.py",
                 "--spec", str(path), "--stage", stage, "--root", str(root),
                 "--device", "cuda", "--cache-dir", str(cache_dir),
-                "--heldout-batch-size", str(heldout_batch_size),
+                "--heldout-batch-size", str(heldout_batch_size), "--defer-heldout",
             ]
             environment = os.environ.copy()
             # Several data-loader-free workers otherwise each create a full CPU
@@ -105,6 +105,24 @@ def run_bounded_stage(
         if time.monotonic() >= deadline and not running:
             break
         time.sleep(10)
+    pending = list((root / stage).glob("*/trial_pending.json"))
+    if pending:
+        log = (log_dir / f"{stage}__heldout_batched.log").open("a", encoding="utf-8")
+        command = [
+            sys.executable, "scripts/evaluate_heldout_stage.py",
+            "--composition-config", str(Path(spec["composition_config"]).resolve()),
+            "--stage-root", str(root / stage), "--device", "cuda",
+            "--cache-dir", str(cache_dir), "--batch-size", str(heldout_batch_size),
+        ]
+        try:
+            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True,
+                           env={**os.environ, "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
+                                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
+        finally:
+            log.close()
+        write_state(state_path, status=f"completed_{stage}_batched_heldout",
+                    completed=len(completed_trials(root, stage)), expected=expected_trials(spec, stage),
+                    queued=len(queue), active=0, failures=failures, heldout_batch_size=heldout_batch_size)
     if queue:
         raise TimeoutError(f"Soft deadline reached with {len(queue)} {stage} set runners not started")
     validate_stage(root, stage, expected_trials(spec, stage))

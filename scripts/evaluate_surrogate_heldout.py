@@ -79,6 +79,30 @@ def _encode_batch(
     return rows
 
 
+def summarize_rows(rows: list[dict], model_ids: list[str]) -> dict:
+    per_model = {}
+    for model_id in model_ids:
+        model_rows = [row for row in rows if row["model"] == model_id]
+        attempted = len(model_rows)
+        valid = [row for row in model_rows if not row["missing"]]
+        per_model[model_id] = {
+            "attempted_items": attempted,
+            "valid_items": len(valid),
+            "missing_items": attempted - len(valid),
+            "asr": sum(bool(row["proxy_success"]) for row in model_rows) / max(1, attempted),
+            "mean_margin_gain": sum(float(row.get("margin_gain", 0.0)) for row in model_rows) / max(1, attempted),
+            "mean_prototype_distance_change": sum(float(row.get("prototype_distance_change", 0.0)) for row in model_rows) / max(1, attempted),
+        }
+    return {
+        "attempted_item_model_pairs": len(rows),
+        "valid_item_model_pairs": sum(not row["missing"] for row in rows),
+        "heldout_models": per_model,
+        "heldout_macro_asr": sum(value["asr"] for value in per_model.values()) / max(1, len(per_model)),
+        "heldout_macro_margin_gain": sum(value["mean_margin_gain"] for value in per_model.values()) / max(1, len(per_model)),
+        "items": rows,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay existing pairs on disjoint held-out OpenCLIP models.")
     parser.add_argument("--composition-config", default="configs/surrogate_composition.yaml")
@@ -120,27 +144,7 @@ def main() -> None:
         finally:
             unload_surrogate(wrapper)
 
-    per_model = {}
-    for model_id in spec.heldout_models:
-        model_rows = [row for row in rows if row["model"] == model_id]
-        attempted = len(model_rows)
-        valid = [row for row in model_rows if not row["missing"]]
-        per_model[model_id] = {
-            "attempted_items": attempted,
-            "valid_items": len(valid),
-            "missing_items": attempted - len(valid),
-            "asr": sum(bool(row["proxy_success"]) for row in model_rows) / max(1, attempted),
-            "mean_margin_gain": sum(float(row.get("margin_gain", 0.0)) for row in model_rows) / max(1, attempted),
-            "mean_prototype_distance_change": sum(float(row.get("prototype_distance_change", 0.0)) for row in model_rows) / max(1, attempted),
-        }
-    summary = {
-        "attempted_item_model_pairs": len(rows),
-        "valid_item_model_pairs": sum(not row["missing"] for row in rows),
-        "heldout_models": per_model,
-        "heldout_macro_asr": sum(value["asr"] for value in per_model.values()) / max(1, len(per_model)),
-        "heldout_macro_margin_gain": sum(value["mean_margin_gain"] for value in per_model.values()) / max(1, len(per_model)),
-        "items": rows,
-    }
+    summary = summarize_rows(rows, spec.heldout_models)
     atomic_write_json(Path(args.output), summary)
     print(json.dumps({key: value for key, value in summary.items() if key != "items"}, indent=2))
 

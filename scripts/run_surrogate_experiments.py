@@ -23,6 +23,8 @@ def main() -> None:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--cache-dir", default="models/open_clip")
     parser.add_argument("--heldout-batch-size", type=int, default=16)
+    parser.add_argument("--defer-heldout", action="store_true",
+                        help="Write validated pending trials for the stage-level batched evaluator.")
     args = parser.parse_args()
     experiment = yaml.safe_load(Path(args.spec).read_text(encoding="utf-8"))
     composition_path = Path(experiment["composition_config"])
@@ -60,6 +62,17 @@ def main() -> None:
             epsilon=float(effective["attack"]["epsilon"]),
             expected_forward_units_per_item=trial["forward_units_per_item"],
         )
+        if args.defer_heldout:
+            atomic_write_json(directory / "trial_pending.json", {
+                "trial": trial,
+                "manifest": dataset["manifest"],
+                "items": trial["items"],
+                "attack_output": str(directory / "attack"),
+                "heldout_output": str(heldout_path),
+                "attack_validation": validation,
+                "attack_command": attack_command,
+            })
+            continue
         with (directory / "heldout.log").open("a", encoding="utf-8") as log:
             subprocess.run(heldout_command, stdout=log, stderr=subprocess.STDOUT, check=True)
         heldout = json.loads(heldout_path.read_text(encoding="utf-8"))
