@@ -1,0 +1,38 @@
+version: 1
+composition_config: configs/research_cycle_composition.yaml
+
+datasets:
+  caption_caltech:
+    base_attack_config: configs/caption_attack_paper_eps8.yaml
+    manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-noise/data/caltech_large/manifest.json
+    augmentation_samples_per_step: 4
+  llava_vqa:
+    base_attack_config: configs/llava_bench_vqa_eps16.yaml
+    manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-geometric/outputs/prepared_datasets/llava_vqa_independent20/manifest.json
+    augmentation_samples_per_step: 4
+  receipt_ocr:
+    base_attack_config: configs/receipt_text_eps16.yaml
+    manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-geometric/outputs/prepared_datasets/receipt_independent_balanced19/manifest.json
+    augmentation_samples_per_step: 4
+
+stages:
+  composition_screen:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    sets: [single_reference, two_homogeneous, two_architecture_mixed,
+           two_pretraining_mixed, incremental_three,
+           four_architecture_mixed, four_vitb_redundant]
+    items: 19
+    # Divisible by 1, 2, 3 and 4 so every set receives exactly 960
+    # surrogate-sample forwards per item (augmentation_samples_per_step=4).
+    reference_steps: 240
+    seeds: [42]
+    budget_mode: equal_forwards
+
+  composition_replication:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    # The cycle freezes this list after screening using held-out results only.
+    sets: [two_homogeneous, two_architecture_mixed, four_architecture_mixed]
+    items: 19
+    reference_steps: 240
+    seeds: [123, 2026]
+    budget_mode: equal_forwards

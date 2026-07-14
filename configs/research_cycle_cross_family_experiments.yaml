@@ -1,0 +1,39 @@
+version: 1
+composition_config: configs/research_cycle_cross_family.yaml
+
+datasets:
+  caption_caltech:
+    base_attack_config: configs/caption_attack_paper_eps8.yaml
+    manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-noise/data/caltech_large/manifest.json
+    augmentation_samples_per_step: 4
+  llava_vqa:
+    base_attack_config: configs/llava_bench_vqa_eps16.yaml
+    manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-geometric/outputs/prepared_datasets/llava_vqa_independent20/manifest.json
+    augmentation_samples_per_step: 4
+  receipt_ocr:
+    base_attack_config: configs/receipt_text_eps16.yaml
+    manifest: /home/ubuntu/attack-vllm/.worktrees/attack-vllm-geometric/outputs/prepared_datasets/receipt_independent_balanced19/manifest.json
+    augmentation_samples_per_step: 4
+
+stages:
+  cross_family_screen:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    sets: [single_openclip_vit, single_openclip_resnet,
+           single_openclip_convnext, single_siglip, single_eva_clip,
+           two_clip_architectures, two_cross_objective, three_cross_family,
+           four_cross_family, five_cross_family]
+    items: 19
+    # Divisible by 1, 2, 3, 4, and 5: every candidate receives exactly
+    # 1200 surrogate-sample forwards per item.
+    reference_steps: 300
+    seeds: [42]
+    budget_mode: equal_forwards
+
+  cross_family_replication:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    # Rewritten into a generated frozen spec by select_transfer_candidates.py.
+    sets: [two_clip_architectures, two_cross_objective, four_cross_family]
+    items: 19
+    reference_steps: 300
+    seeds: [123, 2026]
+    budget_mode: equal_forwards
