@@ -16,6 +16,19 @@ from theory_metrics import (
     neighborhood_overlap,
     uncentered_kernel_alignment,
 )
+from scripts.measure_surrogate_geometry import subsample_indices
+from config import SurrogateConfig
+from surrogates import Dinov2Wrapper
+
+
+class _DinoOutput:
+    def __init__(self, values):
+        self.pooler_output = values
+
+
+class _ToyDino(torch.nn.Module):
+    def forward(self, pixel_values):
+        return _DinoOutput(pixel_values.mean(dim=(-2, -1)))
 
 
 class SurrogateTheoryTests(unittest.TestCase):
@@ -61,6 +74,14 @@ sets: {bad: {models: [x], rationale: bad}}
         self.assertEqual(result["pairwise_cosine"]["a__b"], 0.0)
         self.assertEqual(result["models"]["b"]["effective_equal_weight"], 0.5)
 
+    def test_alignment_subsamples_are_deterministic_and_valid(self):
+        first = subsample_indices(20, [5, 10, 30], 3, 7)
+        second = subsample_indices(20, [5, 10, 30], 3, 7)
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 6)
+        self.assertEqual({size for size, _, _ in first}, {5, 10})
+        self.assertTrue(all(len(indices) == size and len(set(indices)) == size for size, _, indices in first))
+
     def test_equal_forward_budget_and_api_disable(self):
         experiment = yaml.safe_load(Path("configs/surrogate_experiments.yaml").read_text())
         composition = load_composition_spec(experiment["composition_config"])
@@ -81,6 +102,54 @@ sets: {bad: {models: [x], rationale: bad}}
         self.assertEqual({trial["forward_units_per_item"] for trial in trials}, {4800})
         steps = {trial["surrogate_set"]: trial["steps"] for trial in trials if trial["dataset"] == "caption_caltech" and trial["seed"] == 42}
         self.assertEqual(steps, {"single_reference": 1200, "two_homogeneous": 600, "four_lightweight_mixed": 300})
+
+    def test_research_cycle_has_controlled_sets_and_exact_budget(self):
+        experiment = yaml.safe_load(Path("configs/research_cycle_experiments.yaml").read_text())
+        composition = load_composition_spec(experiment["composition_config"])
+        self.assertEqual(
+            composition.sets["four_vitb_redundant"].models,
+            ("vit_b32_laion", "vit_b16_laion", "vit_b32_openai", "vit_b16_openai"),
+        )
+        self.assertEqual(
+            composition.sets["four_architecture_mixed"].models,
+            ("vit_b32_laion", "vit_b16_laion", "vit_b32_openai", "rn50_openai"),
+        )
+        trials = stage_trials(experiment, composition, "composition_screen")
+        self.assertEqual(len(trials), 21)
+        self.assertEqual({trial["forward_units_per_item"] for trial in trials}, {960})
+
+    def test_cross_family_registry_is_explicit_and_disjoint(self):
+        composition = load_composition_spec("configs/research_cycle_cross_family.yaml")
+        families = {value.architecture_family for value in composition.models.values()}
+        self.assertTrue({
+            "openclip_vit", "openclip_resnet", "openclip_convnext",
+            "siglip_vit", "eva02_vit", "dinov2_vit",
+        }.issubset(families))
+        self.assertEqual(composition.models["dinov2_base_control"].evaluation_role, "control")
+        self.assertEqual(composition.models["dinov2_base_control"].backend, "huggingface_dinov2")
+        for value in composition.sets.values():
+            self.assertFalse(set(value.models).intersection(composition.heldout_models))
+
+        experiment = yaml.safe_load(Path("configs/research_cycle_cross_family_experiments.yaml").read_text())
+        trials = stage_trials(experiment, composition, "cross_family_screen")
+        self.assertEqual(len(trials), 30)
+        self.assertEqual({trial["forward_units_per_item"] for trial in trials}, {1200})
+
+    def test_dinov2_wrapper_is_differentiable_and_normalized(self):
+        config = SurrogateConfig(
+            model_name="dinov2-toy",
+            pretrained="local-toy",
+            backend="huggingface_dinov2",
+            use_fp16=False,
+            patch_size=14,
+        )
+        wrapper = Dinov2Wrapper(config, _ToyDino(), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0), 14)
+        images = torch.rand(2, 3, 28, 28, requires_grad=True)
+        embeddings = wrapper.encode_image(images)
+        self.assertEqual(tuple(embeddings.shape), (2, 3))
+        self.assertTrue(torch.allclose(torch.linalg.vector_norm(embeddings, dim=-1), torch.ones(2)))
+        embeddings.sum().backward()
+        self.assertIsNotNone(images.grad)
 
     def test_attack_output_validation(self):
         with tempfile.TemporaryDirectory() as directory:

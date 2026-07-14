@@ -14,6 +14,7 @@ SUPPORTED_PROFILES = ("light", "heavy", "api")
 class SurrogateConfig:
     model_name: str
     pretrained: str
+    backend: str = "open_clip"
     input_size: int = 224
     enabled: bool = True
     patch_size: int | None = None

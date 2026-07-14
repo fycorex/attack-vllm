@@ -1,0 +1,50 @@
+version: 1
+
+models:
+  vit_b32_laion:
+    {model_name: ViT-B-32, pretrained: laion2b_s34b_b79k, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: laion2b, patch_size: 32}
+  vit_b16_laion:
+    {model_name: ViT-B-16, pretrained: laion2b_s34b_b88k, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: laion2b, patch_size: 16}
+  vit_b32_openai:
+    {model_name: ViT-B-32, pretrained: openai, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: openai, patch_size: 32}
+  vit_b16_openai:
+    {model_name: ViT-B-16, pretrained: openai, input_size: 224,
+     architecture_family: vit_b, objective_family: clip, pretraining_family: openai, patch_size: 16}
+  rn50_openai:
+    {model_name: RN50, pretrained: openai, input_size: 224,
+     architecture_family: resnet, objective_family: clip, pretraining_family: openai}
+  rn101_openai_heldout:
+    {model_name: RN101, pretrained: openai, input_size: 224,
+     architecture_family: resnet, objective_family: clip, pretraining_family: openai}
+  vit_l14_openai_heldout:
+    {model_name: ViT-L-14, pretrained: openai, input_size: 224,
+     architecture_family: vit_l, objective_family: clip, pretraining_family: openai, patch_size: 14}
+
+heldout_models: [rn101_openai_heldout, vit_l14_openai_heldout]
+
+sets:
+  single_reference:
+    models: [vit_b32_laion]
+    rationale: Single-proxy blind-selection reference.
+  two_homogeneous:
+    models: [vit_b32_laion, vit_b16_laion]
+    rationale: ViT-B LAION pair with different patch sizes.
+  two_architecture_mixed:
+    models: [vit_b16_laion, rn50_openai]
+    rationale: ViT/ResNet pair retained as a low-redundancy candidate; measured geometry is reported separately.
+  two_pretraining_mixed:
+    models: [vit_b16_laion, vit_b32_openai]
+    rationale: ViT-B pair with different pretraining families.
+  incremental_three:
+    models: [vit_b32_laion, vit_b16_laion, rn50_openai]
+    rationale: Adds an architecture-family control to the two-model reference.
+  four_architecture_mixed:
+    models: [vit_b32_laion, vit_b16_laion, vit_b32_openai, rn50_openai]
+    rationale: Three ViT-B proxies plus one ResNet proxy.
+  four_vitb_redundant:
+    models: [vit_b32_laion, vit_b16_laion, vit_b32_openai, vit_b16_openai]
+    rationale: Four ViT-B proxies spanning two patch sizes and two pretraining families.
+

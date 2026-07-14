@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import itertools
 import json
 import os
 from pathlib import Path
+import random
 import tempfile
 from typing import Any
 
@@ -59,12 +61,29 @@ def _quantiles(values: torch.Tensor) -> dict[str, float]:
     }
 
 
+def subsample_indices(item_count: int, sizes: list[int], repeats: int, seed: int) -> list[tuple[int, int, list[int]]]:
+    if repeats < 1:
+        raise ValueError("subsample repeats must be positive")
+    rng = random.Random(seed)
+    rows = []
+    for size in sorted(set(sizes)):
+        if size < 3 or size > item_count:
+            continue
+        for repeat in range(repeats):
+            rows.append((size, repeat, sorted(rng.sample(range(item_count), size))))
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Measure surrogate kernel geometry without running an attack or API.")
     parser.add_argument("--config", default="configs/surrogate_composition.yaml")
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--sets", nargs="+", default=["single_reference", "two_homogeneous", "four_lightweight_mixed"])
     parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument(
+        "--require-limit", action="store_true",
+        help="Fail unless exactly --limit usable images remain after optional de-duplication.",
+    )
     parser.add_argument(
         "--deduplicate-images", action="store_true",
         help="Select unique source-image SHA-256 values before applying the item limit.",
@@ -74,6 +93,9 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--cache-dir", default="models/open_clip")
     parser.add_argument("--ridge", type=float, default=1e-8)
+    parser.add_argument("--subsample-sizes", nargs="*", type=int, default=[20, 50, 100])
+    parser.add_argument("--subsample-repeats", type=int, default=100)
+    parser.add_argument("--subsample-seed", type=int, default=20260714)
     args = parser.parse_args()
 
     config_path, manifest_path = Path(args.config), Path(args.manifest)
@@ -96,6 +118,10 @@ def main() -> None:
         source_hashes.append(image_hash)
         if len(items) >= args.limit:
             break
+    if args.require_limit and len(items) != args.limit:
+        raise RuntimeError(
+            f"Required {args.limit} usable images after de-duplication, found {len(items)}."
+        )
     if len(items) < 3:
         raise RuntimeError("At least three items are required")
     device = args.device if torch.cuda.is_available() else "cpu"
@@ -114,7 +140,9 @@ def main() -> None:
             norms = torch.linalg.vector_norm(embeddings, dim=-1)
             model_rows.append({
                 "model_id": model_id,
+                "backend": metadata.backend,
                 "openclip_model": metadata.model_name,
+                "checkpoint": metadata.pretrained,
                 "pretrained": metadata.pretrained,
                 "input_size": metadata.input_size,
                 "architecture_family": metadata.architecture_family,
@@ -130,7 +158,7 @@ def main() -> None:
             unload_surrogate(wrapper)
 
     pair_rows = []
-    ks = [k for k in (1, 5, 10) if k < len(items)]
+    ks = [k for k in (1, 3, 5, 10) if k < len(items)]
     for proxy_id in proxy_ids:
         for target_id in spec.heldout_models:
             proxy, target = representations[proxy_id], representations[target_id]
@@ -148,6 +176,39 @@ def main() -> None:
                         for name, result in _quantiles(neighbor_margin(values, k)).items():
                             row[f"{prefix}_neighbor_margin_at_{k}_{name}"] = result
             pair_rows.append(row)
+
+    all_pair_rows = []
+    for first_id, second_id in itertools.combinations(required_ids, 2):
+        first, second = representations[first_id], representations[second_id]
+        row = {
+            "first_model": first_id,
+            "second_model": second_id,
+            "items": len(items),
+            "centered_linear_cka": centered_linear_cka(first, second),
+            "uncentered_kernel_alignment": uncentered_kernel_alignment(first, second),
+        }
+        for k in ks:
+            row[f"neighborhood_overlap_at_{k}"] = neighborhood_overlap(first, second, k)
+        all_pair_rows.append(row)
+
+    subsample_rows = []
+    draws = subsample_indices(len(items), args.subsample_sizes, args.subsample_repeats, args.subsample_seed)
+    for first_id, second_id in itertools.combinations(required_ids, 2):
+        first, second = representations[first_id], representations[second_id]
+        for size, repeat, indices in draws:
+            first_sample, second_sample = first[indices], second[indices]
+            row = {
+                "first_model": first_id,
+                "second_model": second_id,
+                "sample_size": size,
+                "repeat": repeat,
+                "centered_linear_cka": centered_linear_cka(first_sample, second_sample),
+                "uncentered_kernel_alignment": uncentered_kernel_alignment(first_sample, second_sample),
+            }
+            for k in (1, 3, 5, 10):
+                if k < size:
+                    row[f"neighborhood_overlap_at_{k}"] = neighborhood_overlap(first_sample, second_sample, k)
+            subsample_rows.append(row)
 
     ensemble_rows = []
     for set_name, surrogate_set in selected_sets.items():
@@ -181,13 +242,21 @@ def main() -> None:
         "heldout_models": list(spec.heldout_models),
         "device": device,
         "ridge": args.ridge,
+        "subsample_sizes": args.subsample_sizes,
+        "subsample_repeats": args.subsample_repeats,
+        "subsample_seed": args.subsample_seed,
         **git_state(Path.cwd()),
     }
     atomic_write_json(output / "run_manifest.json", run_manifest)
     atomic_write_json(output / "model_measurements.json", model_rows)
     _atomic_csv(output / "pairwise_alignment_metrics.csv", pair_rows)
+    _atomic_csv(output / "all_model_pair_metrics.csv", all_pair_rows)
+    _atomic_csv(output / "alignment_subsample_bootstrap.csv", subsample_rows)
     _atomic_csv(output / "ensemble_theory_metrics.csv", ensemble_rows)
-    print(json.dumps({"models": len(model_rows), "pairs": len(pair_rows), "ensemble_rows": len(ensemble_rows), "output": str(output)}, indent=2))
+    print(json.dumps({"models": len(model_rows), "proxy_target_pairs": len(pair_rows),
+                      "all_model_pairs": len(all_pair_rows), "subsample_rows": len(subsample_rows),
+                      "ensemble_rows": len(ensemble_rows),
+                      "output": str(output)}, indent=2))
 
 
 if __name__ == "__main__":

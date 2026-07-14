@@ -81,6 +81,36 @@ class SurrogateWrapper:
         return F.normalize(features.float(), dim=-1)
 
 
+class Dinov2Wrapper(SurrogateWrapper):
+    """Differentiable image-only DINOv2 adapter used as a held-out control.
+
+    Images arrive as float tensors in [0, 1] and are already resized by the
+    attack/evaluation caller.  Keeping preprocessing in torch preserves image
+    gradients when this backend is explicitly used as an attack surrogate.
+    """
+
+    def encode_image(
+        self,
+        images: torch.Tensor,
+        patch_drop_rate: float = 0.0,
+        drop_path_max_rate: float = 0.0,
+    ) -> torch.Tensor:
+        del drop_path_max_rate
+        images = self.apply_patch_drop(images, patch_drop_rate)
+        images = self.normalize(images)
+        autocast_enabled = images.device.type == "cuda" and self.config.use_fp16
+        with torch.autocast(
+            device_type=images.device.type,
+            dtype=torch.float16,
+            enabled=autocast_enabled,
+        ):
+            output = self.model(pixel_values=images)
+            features = getattr(output, "pooler_output", None)
+            if features is None:
+                features = output.last_hidden_state[:, 0]
+        return F.normalize(features.float(), dim=-1)
+
+
 def _extract_mean_std(preprocess) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
     for transform in getattr(preprocess, "transforms", []):
         if isinstance(transform, Normalize):
@@ -128,6 +158,37 @@ def create_surrogate(config: SurrogateConfig, device: str, cache_dir: str | Path
     resolved_cache_dir = Path(cache_dir) if cache_dir is not None else None
     if resolved_cache_dir is not None:
         resolved_cache_dir.mkdir(parents=True, exist_ok=True)
+    if config.backend == "huggingface_dinov2":
+        try:
+            from transformers import AutoImageProcessor, AutoModel
+        except ImportError as error:
+            raise RuntimeError(
+                "The huggingface_dinov2 backend requires transformers."
+            ) from error
+        checkpoint = config.pretrained or config.model_name
+        processor = AutoImageProcessor.from_pretrained(
+            checkpoint,
+            cache_dir=str(resolved_cache_dir) if resolved_cache_dir is not None else None,
+        )
+        model = AutoModel.from_pretrained(
+            checkpoint,
+            cache_dir=str(resolved_cache_dir) if resolved_cache_dir is not None else None,
+        )
+        model.to(device)
+        model.eval()
+        model.requires_grad_(False)
+        mean = tuple(float(value) for value in processor.image_mean)
+        std = tuple(float(value) for value in processor.image_std)
+        return Dinov2Wrapper(
+            config=config,
+            model=model,
+            mean=mean,
+            std=std,
+            patch_size=config.patch_size or 14,
+        )
+    if config.backend != "open_clip":
+        raise ValueError(f"Unsupported surrogate backend: {config.backend}")
+
     model, _, preprocess = open_clip.create_model_and_transforms(
         model_name=config.model_name,
         pretrained=config.pretrained,

@@ -1,0 +1,93 @@
+version: 1
+
+# This registry separates attack surrogates from disjoint held-out encoders.
+# DINOv2 is an image-only control and is never described as a VLM.
+models:
+  vit_b32_laion:
+    {model_name: ViT-B-32, pretrained: laion2b_s34b_b79k, input_size: 224,
+     architecture_family: openclip_vit, objective_family: clip,
+     pretraining_family: laion2b, patch_size: 32}
+  rn50_openai:
+    {model_name: RN50, pretrained: openai, input_size: 224,
+     architecture_family: openclip_resnet, objective_family: clip,
+     pretraining_family: openai}
+  convnext_base_laion:
+    {model_name: convnext_base, pretrained: laion400m_s13b_b51k, input_size: 224,
+     architecture_family: openclip_convnext, objective_family: clip,
+     pretraining_family: laion400m}
+  siglip_b16_webli:
+    {model_name: ViT-B-16-SigLIP, pretrained: webli, input_size: 224,
+     architecture_family: siglip_vit, objective_family: sigmoid_contrastive,
+     pretraining_family: webli, patch_size: 16}
+  eva02_b16_merged:
+    {model_name: EVA02-B-16, pretrained: merged2b_s8b_b131k, input_size: 224,
+     architecture_family: eva02_vit, objective_family: clip,
+     pretraining_family: merged2b, patch_size: 16}
+
+  vit_l14_openai_heldout:
+    {model_name: ViT-L-14, pretrained: openai, input_size: 224,
+     architecture_family: openclip_vit, objective_family: clip,
+     pretraining_family: openai, patch_size: 14}
+  rn101_openai_heldout:
+    {model_name: RN101, pretrained: openai, input_size: 224,
+     architecture_family: openclip_resnet, objective_family: clip,
+     pretraining_family: openai}
+  convnext_base_w_heldout:
+    {model_name: convnext_base_w, pretrained: laion2b_s13b_b82k, input_size: 256,
+     architecture_family: openclip_convnext, objective_family: clip,
+     pretraining_family: laion2b}
+  siglip2_b16_heldout:
+    {model_name: ViT-B-16-SigLIP2-256, pretrained: webli, input_size: 256,
+     architecture_family: siglip2_vit, objective_family: sigmoid_contrastive,
+     pretraining_family: webli, patch_size: 16}
+  eva02_l14_heldout:
+    {model_name: EVA02-L-14, pretrained: merged2b_s4b_b131k, input_size: 224,
+     architecture_family: eva02_vit, objective_family: clip,
+     pretraining_family: merged2b, patch_size: 14}
+  dinov2_base_control:
+    {model_name: dinov2-base, pretrained: facebook/dinov2-base,
+     backend: huggingface_dinov2, input_size: 518,
+     architecture_family: dinov2_vit, objective_family: self_supervised_visual,
+     pretraining_family: lvd142m, patch_size: 14, evaluation_role: control,
+     rationale: Image-only out-of-domain control; excluded from the primary VLM macro score.}
+
+heldout_models:
+  - vit_l14_openai_heldout
+  - rn101_openai_heldout
+  - convnext_base_w_heldout
+  - siglip2_b16_heldout
+  - eva02_l14_heldout
+  - dinov2_base_control
+
+sets:
+  single_openclip_vit:
+    models: [vit_b32_laion]
+    rationale: OpenCLIP ViT reference.
+  single_openclip_resnet:
+    models: [rn50_openai]
+    rationale: OpenCLIP ResNet architecture control.
+  single_openclip_convnext:
+    models: [convnext_base_laion]
+    rationale: OpenCLIP ConvNeXt architecture control.
+  single_siglip:
+    models: [siglip_b16_webli]
+    rationale: Sigmoid-loss vision-language surrogate.
+  single_eva_clip:
+    models: [eva02_b16_merged]
+    rationale: EVA-CLIP representation family surrogate.
+  two_clip_architectures:
+    models: [vit_b32_laion, rn50_openai]
+    rationale: Two CLIP objectives with different visual architectures.
+  two_cross_objective:
+    models: [vit_b32_laion, siglip_b16_webli]
+    rationale: CLIP and SigLIP objective diversity.
+  three_cross_family:
+    models: [vit_b32_laion, convnext_base_laion, siglip_b16_webli]
+    rationale: ViT, ConvNeXt, and SigLIP representation families.
+  four_cross_family:
+    models: [vit_b32_laion, rn50_openai, siglip_b16_webli, eva02_b16_merged]
+    rationale: ViT, ResNet, SigLIP, and EVA-CLIP attack ensemble.
+  five_cross_family:
+    models: [vit_b32_laion, rn50_openai, convnext_base_laion,
+             siglip_b16_webli, eva02_b16_merged]
+    rationale: Full feasible cross-family screening ensemble.

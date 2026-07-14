@@ -20,10 +20,18 @@ class ModelMetadata:
     objective_family: str
     pretraining_family: str
     patch_size: int | None = None
+    backend: str = "open_clip"
+    evaluation_role: str = "primary"
     rationale: str = ""
 
     def victim_config(self) -> dict[str, Any]:
-        return {"model_name": self.model_name, "pretrained": self.pretrained, "input_size": self.input_size}
+        return {
+            "model_name": self.model_name,
+            "pretrained": self.pretrained,
+            "backend": self.backend,
+            "input_size": self.input_size,
+            "patch_size": self.patch_size,
+        }
 
 
 @dataclass(frozen=True)
