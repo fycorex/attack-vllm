@@ -22,6 +22,7 @@ def main() -> None:
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--cache-dir", default="models/open_clip")
+    parser.add_argument("--heldout-batch-size", type=int, default=16)
     args = parser.parse_args()
     experiment = yaml.safe_load(Path(args.spec).read_text(encoding="utf-8"))
     composition_path = Path(experiment["composition_config"])
@@ -50,7 +51,7 @@ def main() -> None:
         heldout_command = [sys.executable, "scripts/evaluate_surrogate_heldout.py", "--composition-config", str(composition_path),
                            "--manifest", dataset["manifest"], "--attack-output", str(directory / "attack"),
                            "--output", str(heldout_path), "--device", args.device, "--cache-dir", args.cache_dir,
-                           "--limit", str(trial["items"])]
+                           "--limit", str(trial["items"]), "--batch-size", str(args.heldout_batch_size)]
         with (directory / "attack.log").open("a", encoding="utf-8") as log:
             subprocess.run(attack_command, stdout=log, stderr=subprocess.STDOUT, check=True)
         validation = validate_attack_output(

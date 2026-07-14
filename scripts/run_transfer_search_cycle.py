@@ -55,6 +55,7 @@ def run_bounded_stage(
     stage: str,
     root: Path,
     jobs: int,
+    heldout_batch_size: int,
     cache_dir: Path,
     state_path: Path,
     deadline: float,
@@ -75,8 +76,14 @@ def run_bounded_stage(
                 sys.executable, "scripts/run_surrogate_experiments.py",
                 "--spec", str(path), "--stage", stage, "--root", str(root),
                 "--device", "cuda", "--cache-dir", str(cache_dir),
+                "--heldout-batch-size", str(heldout_batch_size),
             ]
-            process = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+            environment = os.environ.copy()
+            # Several data-loader-free workers otherwise each create a full CPU
+            # thread pool while GPU batches wait on image decoding.
+            environment.setdefault("OMP_NUM_THREADS", "1")
+            environment.setdefault("MKL_NUM_THREADS", "1")
+            process = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=environment)
             running.append((path, process, log))
         remaining = []
         for path, process, log in running:
@@ -510,6 +517,7 @@ def main() -> None:
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--hours", type=float, default=9.0)
     parser.add_argument("--gpu-jobs", type=int, default=2)
+    parser.add_argument("--heldout-batch-size", type=int, default=16)
     parser.add_argument("--augmentation-workers", type=int, default=1)
     parser.add_argument("--promote", type=int, default=3)
     parser.add_argument("--skip-measurement", action="store_true")
@@ -547,7 +555,7 @@ def main() -> None:
         args.augmentation_workers,
     )
     screen_root = output / "attacks"
-    run_bounded_stage(spec, spec_path, "cross_family_screen", screen_root, args.gpu_jobs, cache_dir, state, deadline)
+    run_bounded_stage(spec, spec_path, "cross_family_screen", screen_root, args.gpu_jobs, args.heldout_batch_size, cache_dir, state, deadline)
     analysis_csv = run_analysis(screen_root, output / "analysis_screen")
     screen_selection = select_and_write(
         analysis_csv, ROOT / spec["composition_config"], "cross_family_screen",
@@ -583,7 +591,7 @@ def main() -> None:
         augmentation_replication_spec, augmentation_replication_stage, output,
         args.augmentation_workers,
     )
-    run_bounded_stage(frozen, frozen_path, "cross_family_replication", screen_root, args.gpu_jobs, cache_dir, state, deadline)
+    run_bounded_stage(frozen, frozen_path, "cross_family_replication", screen_root, args.gpu_jobs, args.heldout_batch_size, cache_dir, state, deadline)
     wait_process(alignment_process, alignment_log, "alignment analysis")
     wait_process(augmentation_replication_process, augmentation_replication_log, "augmentation replication")
     augmentation_final = select_augmentations(
