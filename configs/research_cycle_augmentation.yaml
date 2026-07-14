@@ -1,0 +1,64 @@
+version: 1
+selection_metric: heldout_macro_asr
+
+datasets:
+  caption_caltech:
+    attack_config: configs/caption_attack_paper_eps8.yaml
+    manifest: data/caltech_large/manifest.json
+    task: caption
+  llava_vqa:
+    attack_config: configs/llava_bench_vqa_eps16.yaml
+    manifest: outputs/prepared_datasets/llava_vqa_independent20/manifest.json
+    task: vqa
+  receipt_ocr:
+    attack_config: configs/receipt_text_eps16.yaml
+    manifest: outputs/prepared_datasets/receipt_independent_balanced19/manifest.json
+    task: receipt_ocr
+
+surrogate_groups:
+  vit_resnet_diverse:
+    rationale: Fixed ViT/ResNet attack pair with disjoint held-out models.
+    sequential: false
+    attack:
+      - {model_name: ViT-B-32, pretrained: laion2b_s34b_b79k, input_size: 224}
+      - {model_name: RN50, pretrained: openai, input_size: 224}
+    heldout:
+      - {model_name: ViT-B-16, pretrained: openai, input_size: 224}
+      - {model_name: RN101, pretrained: openai, input_size: 224}
+
+stages:
+  strict_equal_forward_screen:
+    datasets: [caption_caltech, llava_vqa, receipt_ocr]
+    surrogate_groups: [vit_resnet_diverse]
+    items: 19
+    steps: 200
+    seeds: [42]
+    noise: {modes: [], sigmas: [], samples: []}
+    explicit_conditions:
+      - {mode: none, sigma: 0.0, samples: 1,
+         geometry_mode: none, geometry_samples: 1,
+         steps: 200, budget_label: 200_transform_samples}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 1,
+         geometry_mode: none, geometry_samples: 1,
+         steps: 200, budget_label: 200_transform_samples}
+      - {mode: uniform_eot, sigma: 0.0078431373, samples: 1,
+         geometry_mode: none, geometry_samples: 1,
+         steps: 200, budget_label: 200_transform_samples}
+      - {mode: rademacher_eot, sigma: 0.0078431373, samples: 1,
+         geometry_mode: none, geometry_samples: 1,
+         steps: 200, budget_label: 200_transform_samples}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 2,
+         geometry_mode: none, geometry_samples: 1,
+         steps: 100, budget_label: 200_transform_samples}
+      - {mode: antithetic_gaussian_eot, sigma: 0.0078431373, samples: 2,
+         geometry_mode: none, geometry_samples: 1,
+         steps: 100, budget_label: 200_transform_samples}
+      - {mode: none, sigma: 0.0, samples: 1,
+         geometry_mode: translation, geometry_samples: 2,
+         steps: 100, budget_label: 200_transform_samples}
+      - {mode: none, sigma: 0.0, samples: 1,
+         geometry_mode: resize_pad, geometry_samples: 2,
+         steps: 100, budget_label: 200_transform_samples}
+      - {mode: gaussian_eot, sigma: 0.0078431373, samples: 1,
+         geometry_mode: translation, geometry_samples: 2,
+         steps: 100, budget_label: 200_transform_samples}

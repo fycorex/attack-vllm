@@ -41,6 +41,17 @@ class GeometricValidationTests(unittest.TestCase):
             units.add(trial["steps"] * noise_samples * geometry_samples)
         self.assertEqual(units, {400})
 
+    def test_research_cycle_single_and_two_sample_conditions_match_budget(self):
+        spec = yaml.safe_load(Path("configs/research_cycle_augmentation.yaml").read_text())
+        trials = matrix(spec, "strict_equal_forward_screen")
+        self.assertEqual(len(trials), 27)
+        units = set()
+        for trial in trials:
+            noise_samples = trial["samples"] if trial["mode"].endswith("_eot") else 1
+            geometry_samples = trial["geometry_samples"] if trial["geometry_mode"] != "none" else 1
+            units.add(trial["steps"] * noise_samples * geometry_samples)
+        self.assertEqual(units, {200})
+
 
 if __name__ == "__main__":
     unittest.main()
