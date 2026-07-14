@@ -180,7 +180,13 @@ def start_augmentation_stage(
         "--stage", stage, "--root", str(output / "augmentation"),
         "--workers", str(workers), "--python", str(python),
     ]
-    process = subprocess.Popen(command, cwd=GEOMETRIC_ROOT, stdout=log, stderr=subprocess.STDOUT)
+    # The parent cycle runs with this worktree's src first on PYTHONPATH.  The
+    # geometric runner has a different AttackHyperParams schema, so inheriting
+    # that path silently imports the wrong config module and rejects its noise
+    # fields.  Pin the child to its own source tree.
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join([str(GEOMETRIC_ROOT / "src"), str(GEOMETRIC_ROOT)])
+    process = subprocess.Popen(command, cwd=GEOMETRIC_ROOT, stdout=log, stderr=subprocess.STDOUT, env=environment)
     return process, log
 
 
