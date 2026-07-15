@@ -124,27 +124,24 @@ mechanism and not evidence about proprietary model internals.
 
 ## Noise and geometric augmentation status
 
-The standalone `exp/noise-transferability` branch does **not** currently have a
-completed saved trial registry from which a defensible result can be reported.
-Its tracked result document remains intentionally empty. It would be incorrect
-to label the completed geometric-cycle numbers as a completed standalone
-Gaussian/random-noise experiment.
+The standalone `exp/noise-transferability` branch does have completed saved
+registries: 17 smoke trials, 126 stage-1 trials, 90 strict equal-forward
+trials, and 54 final trials. Its tracked summary was stale, which previously
+caused this report to understate the available evidence.
 
-The completed augmentation evidence reported above is therefore labeled
-precisely:
+The key distinction is now recorded in
+`LATEST_TRICK_EXPERIMENT_REPORT.md`:
 
-- **Translation EOT** is a completed geometric-augmentation result.
-- **Gaussian** and **Gaussian plus translation** are completed conditions in
-  that same equal-forward augmentation matrix.
-- No completed result presently establishes a variance-matched
-  Gaussian-versus-uniform-versus-Rademacher comparison on the independent noise
-  branch.
+- Translation EOT is a geometric-augmentation result.
+- The independent noise branch has Gaussian, antithetic Gaussian, uniform, and
+  Rademacher EOT comparisons.
+- Fixed-step Gaussian results can be positive, but four-sample EOT does not
+  show a general positive result against additional deterministic iterations
+  under strict equal-forward accounting.
 
-The missing noise experiment is an explicit gap: run `none`, single-sample
-Gaussian, variance-matched uniform, variance-matched Rademacher, and two-sample
-Gaussian EOT at equal surrogate-forward budget; then report task-stratified
-held-out ASR and the corresponding local-stability diagnostics. API replay must
-remain a frozen final confirmation rather than a selector.
+The remaining noise gap is theory-facing local-stability analysis and
+family-balanced target reporting, not the basic distribution comparison. API
+replay remains a frozen final confirmation rather than a selector.
 
 ## Independent 200-image confirmation
 
