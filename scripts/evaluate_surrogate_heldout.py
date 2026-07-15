@@ -31,33 +31,62 @@ def _batches(values: list, batch_size: int):
 def _prepare_batch(batch: list, size: int, loader_workers: int = 1) -> tuple[list, tuple[torch.Tensor, ...], float]:
     """Decode/resize a real image batch on CPU, optionally in parallel."""
     started = time.perf_counter()
-    requests: list[tuple[str, Path]] = []
-    for item, item_dir in batch:
-        requests.extend([("clean", item_dir / "clean.png"), ("adversarial", item_dir / "adversarial.png")])
-        requests.extend([("positive", path) for path in item.positive_image_paths])
-        requests.extend([("negative", path) for path in item.negative_image_paths])
+    requests: list[tuple[str, int, int, Path]] = []
+    for item_index, (item, item_dir) in enumerate(batch):
+        requests.extend([
+            ("clean", item_index, 0, item_dir / "clean.png"),
+            ("adversarial", item_index, 0, item_dir / "adversarial.png"),
+        ])
+        requests.extend(("positive", item_index, index, path)
+                        for index, path in enumerate(item.positive_image_paths))
+        requests.extend(("negative", item_index, index, path)
+                        for index, path in enumerate(item.negative_image_paths))
+
+    def load(request):
+        return request[:3], load_image_tensor(request[3], size)
+
     if loader_workers > 1:
         with ThreadPoolExecutor(max_workers=loader_workers) as pool:
-            tensors = list(pool.map(lambda request: load_image_tensor(request[1], size), requests))
+            loaded = pool.map(load, requests)
+            tensors = _assemble_preallocated_batch(loaded, batch)
     else:
-        tensors = [load_image_tensor(path, size) for _, path in requests]
-    positive_counts = len(batch[0][0].positive_image_paths)
-    negative_counts = len(batch[0][0].negative_image_paths)
-    stride = positive_counts + negative_counts + 2
-    clean = torch.stack([tensors[index * stride] for index in range(len(batch))])
-    adversarial = torch.stack([tensors[index * stride + 1] for index in range(len(batch))])
-    positives = torch.stack([torch.stack(tensors[index * stride + 2:index * stride + 2 + positive_counts])
-                             for index in range(len(batch))])
-    negatives = torch.stack([torch.stack(tensors[index * stride + 2 + positive_counts:index * stride + stride])
-                             for index in range(len(batch))])
-    tensors_out = (clean, adversarial, positives, negatives)
-    if torch.cuda.is_available():
-        tensors_out = tuple(tensor.pin_memory() for tensor in tensors_out)
-    return batch, tensors_out, time.perf_counter() - started
+        tensors = _assemble_preallocated_batch(map(load, requests), batch)
+    return batch, tensors, time.perf_counter() - started
+
+
+def _assemble_preallocated_batch(loaded, batch: list) -> tuple[torch.Tensor, ...]:
+    """Write decoded images directly into final pinned tensors.
+
+    Avoid retaining both a Python list of every decoded reference image and a
+    second stacked copy.  Large held-out batches may contain thousands of
+    positive/negative references, so the old double-buffered representation
+    could exhaust host memory before the GPU batch started.
+    """
+    positive_count = len(batch[0][0].positive_image_paths)
+    negative_count = len(batch[0][0].negative_image_paths)
+    outputs = None
+    for (kind, item_index, reference_index), tensor in loaded:
+        if outputs is None:
+            options = {"dtype": tensor.dtype, "pin_memory": torch.cuda.is_available()}
+            image_shape = tuple(tensor.shape)
+            outputs = {
+                "clean": torch.empty((len(batch), *image_shape), **options),
+                "adversarial": torch.empty((len(batch), *image_shape), **options),
+                "positive": torch.empty((len(batch), positive_count, *image_shape), **options),
+                "negative": torch.empty((len(batch), negative_count, *image_shape), **options),
+            }
+        if kind in {"clean", "adversarial"}:
+            outputs[kind][item_index].copy_(tensor)
+        else:
+            outputs[kind][item_index, reference_index].copy_(tensor)
+    if outputs is None:
+        raise ValueError("Cannot prepare an empty held-out batch")
+    return outputs["clean"], outputs["adversarial"], outputs["positive"], outputs["negative"]
 
 
 def _score_prepared_batch(
     wrapper, batch: list, tensors: tuple[torch.Tensor, ...], device: str, top_k: int,
+    reference_chunk_size: int = 512,
 ) -> tuple[list[dict], float]:
     """Run four real image groups on GPU after CPU-side prefetch has completed."""
     clean, adversarial, positives, negatives = (tensor.to(device, non_blocking=True) for tensor in tensors)
@@ -67,8 +96,12 @@ def _score_prepared_batch(
     with torch.inference_mode():
         clean_embeddings = wrapper.encode_image(clean)
         adversarial_embeddings = wrapper.encode_image(adversarial)
-        positive_embeddings = wrapper.encode_image(positives.flatten(0, 1)).reshape(len(batch), positive_counts, -1)
-        negative_embeddings = wrapper.encode_image(negatives.flatten(0, 1)).reshape(len(batch), negative_counts, -1)
+        positive_embeddings = _encode_in_chunks(
+            wrapper, positives.flatten(0, 1), reference_chunk_size,
+        ).reshape(len(batch), positive_counts, -1)
+        negative_embeddings = _encode_in_chunks(
+            wrapper, negatives.flatten(0, 1), reference_chunk_size,
+        ).reshape(len(batch), negative_counts, -1)
 
     rows = []
     for index, (item, _) in enumerate(batch):
@@ -92,6 +125,32 @@ def _score_prepared_batch(
             **result,
         })
     return rows, time.perf_counter() - started
+
+
+def _encode_in_chunks(wrapper, images: torch.Tensor, chunk_size: int) -> torch.Tensor:
+    """Bound activation memory while preserving one logical replay batch.
+
+    Encoder families have very different activation footprints (notably
+    DINOv2 at 518 px).  Retry only the current inference chunk at half size on
+    CUDA OOM instead of failing the complete multi-model replay.
+    """
+    if chunk_size < 1:
+        raise ValueError("reference chunk size must be positive")
+    outputs = []
+    offset = 0
+    active_chunk_size = min(chunk_size, len(images))
+    while offset < len(images):
+        current = min(active_chunk_size, len(images) - offset)
+        try:
+            outputs.append(wrapper.encode_image(images[offset:offset + current]))
+        except torch.cuda.OutOfMemoryError:
+            if current == 1:
+                raise
+            active_chunk_size = max(1, current // 2)
+            torch.cuda.empty_cache()
+            continue
+        offset += current
+    return torch.cat(outputs)
 
 
 def _encode_batch(wrapper, batch: list, size: int, device: str, top_k: int) -> list[dict]:

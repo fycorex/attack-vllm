@@ -8,6 +8,7 @@ model loads and short, CPU-bound per-trial GPU bursts.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -39,8 +40,9 @@ def main() -> None:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--cache-dir", default="models/open_clip")
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--prefetch-batches", type=int, default=2)
+    parser.add_argument("--prefetch-batches", type=int, default=1)
     parser.add_argument("--loader-workers", type=int, default=8)
+    parser.add_argument("--reference-chunk-size", type=int, default=512)
     parser.add_argument("--profile-output", help="Write CPU decode and GPU-batch timing for a real replay run.")
     args = parser.parse_args()
     if args.batch_size < 1:
@@ -54,8 +56,11 @@ def main() -> None:
     device = args.device if torch.cuda.is_available() else "cpu"
     rows_by_trial: dict[Path, list[dict]] = defaultdict(list)
     timing_rows = []
+    checkpoint_root = Path(args.stage_root) / ".heldout_model_rows"
+    checkpoint_root.mkdir(parents=True, exist_ok=True)
 
     records_by_shape: dict[tuple[int, int], list[tuple[dict, object, Path]]] = defaultdict(list)
+    trial_by_item_dir: dict[Path, dict] = {}
     for trial in pending:
         manifest = load_manifest(trial["manifest"])
         items = manifest.items[:int(trial["items"])]
@@ -69,10 +74,20 @@ def main() -> None:
                     })
                 continue
             records_by_shape[(len(item.positive_image_paths), len(item.negative_image_paths))].append((trial, item, item_dir))
+            trial_by_item_dir[item_dir] = trial
 
     for model_id in spec.heldout_models:
+        checkpoint = checkpoint_root / f"{hashlib.sha1(model_id.encode()).hexdigest()[:12]}.json"
+        if checkpoint.is_file():
+            payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+            if payload.get("model") != model_id:
+                raise ValueError(f"Held-out checkpoint model mismatch: {checkpoint}")
+            for entry in payload["trials"]:
+                rows_by_trial[Path(entry["directory"])].extend(entry["rows"])
+            continue
         metadata = spec.models[model_id]
         wrapper = create_surrogate(SurrogateConfig(**metadata.victim_config()), device, cache_dir=args.cache_dir)
+        model_rows: dict[Path, list[dict]] = defaultdict(list)
         try:
             for records in records_by_shape.values():
                 batches = ([ (item, item_dir) for _, item, item_dir in batch ]
@@ -80,13 +95,26 @@ def main() -> None:
                 for batch, tensors, cpu_seconds in prefetched_batches(
                     batches, metadata.input_size, args.prefetch_batches, args.loader_workers,
                 ):
-                    encoded, gpu_wall_seconds = _score_prepared_batch(wrapper, batch, tensors, device, top_k=10)
+                    encoded, gpu_wall_seconds = _score_prepared_batch(
+                        wrapper, batch, tensors, device, top_k=10,
+                        reference_chunk_size=args.reference_chunk_size,
+                    )
                     timing_rows.append({"model": model_id, "items": len(batch), "cpu_prepare_seconds": cpu_seconds,
                                         "gpu_batch_wall_seconds": gpu_wall_seconds})
-                    for (trial, _, _), row in zip(batch, encoded):
-                        rows_by_trial[trial["directory"]].append({"model": model_id, **row})
+                    for (_, item_dir), row in zip(batch, encoded):
+                        trial = trial_by_item_dir[item_dir]
+                        result = {"model": model_id, **row}
+                        rows_by_trial[trial["directory"]].append(result)
+                        model_rows[trial["directory"]].append(result)
         finally:
             unload_surrogate(wrapper)
+        atomic_write_json(checkpoint, {
+            "model": model_id,
+            "trials": [
+                {"directory": str(directory), "rows": rows}
+                for directory, rows in sorted(model_rows.items(), key=lambda value: str(value[0]))
+            ],
+        })
 
     completed = 0
     for trial in pending:

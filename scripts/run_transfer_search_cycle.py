@@ -183,7 +183,7 @@ def run_measurements(spec: dict[str, Any], output: Path, cache_dir: Path) -> Non
             sys.executable, "scripts/measure_surrogate_geometry.py",
             "--config", str(composition), "--manifest", spec["datasets"][dataset]["manifest"],
             "--sets", *set_names, "--limit", str(limit), "--deduplicate-images",
-            "--output", str(destination), "--device", "cuda", "--batch-size", "8",
+            "--output", str(destination), "--device", "cuda", "--batch-size", "64",
             "--cache-dir", str(cache_dir), "--subsample-sizes", "10", "20", "50", "100",
             "--subsample-repeats", "100",
         ]
@@ -308,7 +308,11 @@ def run_alignment_join(
     stage: str,
     output: Path,
 ) -> tuple[subprocess.Popen, Any]:
-    python = ALIGNMENT_ROOT / ".venv/bin/python"
+    # The alignment worktree intentionally shares the already-provisioned
+    # research environment instead of carrying another virtualenv.  Isolate
+    # its source tree through PYTHONPATH so its analysis modules are resolved
+    # without importing this branch's similarly named modules.
+    python = Path(sys.executable)
     log_path = output.parent / "runner_logs/alignment.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log = log_path.open("a", encoding="utf-8")
@@ -321,7 +325,14 @@ def run_alignment_join(
         "--alignment-metric-map", f"receipt_ocr={measurement_root / 'receipt_ocr/pairwise_alignment_metrics.csv'}",
         "--stages", stage, "--output", str(output), "--bootstrap-samples", "2000",
     ]
-    process = subprocess.Popen(command, cwd=ALIGNMENT_ROOT, stdout=log, stderr=subprocess.STDOUT)
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join([
+        str(ALIGNMENT_ROOT / "src"), str(ALIGNMENT_ROOT),
+    ])
+    process = subprocess.Popen(
+        command, cwd=ALIGNMENT_ROOT, stdout=log, stderr=subprocess.STDOUT,
+        env=environment,
+    )
     return process, log
 
 
