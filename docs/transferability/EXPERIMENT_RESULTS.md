@@ -82,20 +82,69 @@ that total surrogate-forward units remain matched.
 
 ## Completed representation analysis
 
-Earlier small-sample measurements suggested that local neighborhood overlap
-(NO) was more discriminative than global CKA in a homogeneous OpenCLIP-heavy
-model pool. The expanded cross-family analysis changes the certainty of that
-statement:
+The completed alignment branch joins 12 single-proxy transfer trials to
+representation metrics. The inferential table contains 720 item-target rows:
+four proxies, three seeds, 20 items, and three disjoint held-out targets.
 
-| Analysis set | Centered CKA to ASR | NO@3 to ASR | Interpretation |
-|---|---:|---:|---|
-| Includes DINOv2 control | Spearman 0.494 | Spearman 0.597 | Heterogeneous control expands the metric range. |
-| Excludes DINOv2 control | Spearman 0.251, bootstrap interval crosses zero | Spearman 0.424, bootstrap interval crosses zero | Neither global CKA nor NO is established as a stable predictor in the primary family alone. |
+| Predictor of held-out transfer ASR | Spearman | 95% item-clustered bootstrap interval |
+|---|---:|---:|
+| Centered linear CKA | -0.025 | [-0.739, 0.594] |
+| Uncentered normalized alignment | -0.473 | [-0.742, 0.036] |
+| NO@1 | 0.685 | [0.132, 0.899] |
+| NO@5 | -0.025 | [-0.691, 0.578] |
+| NO@10 | 0.014 | [-0.662, 0.628] |
 
-The distance path is more consistent in the available data: decreasing proxy
-target-prototype distance tends to accompany decreasing target distance, while
-decreasing target distance has the expected direction for target success. This
-is descriptive evidence, not a causal proof.
+The target-distance path has more consistent support in this matrix:
+
+| Relationship | Spearman / effect | Uncertainty or comparison |
+|---|---:|---|
+| Delta proxy distance to delta target distance | 0.309 | [0.168, 0.451] bootstrap interval |
+| Delta target distance to target success | -0.391 | [-0.527, -0.226] bootstrap interval |
+| Mean target-distance change, success vs failure | -0.0502 vs -0.0008 | descriptive item-level comparison |
+| Delta proxy distance to target success | -0.184 | [-0.365, 0.039] bootstrap interval |
+
+### Alignment audit and interpretation
+
+- Caltech global centered CKA was high (0.928--0.969) while NO@1 was only
+  0.30--0.48, indicating that high global similarity did not imply identical
+  nearest-neighbor ordering.
+- Alignment rankings vary across data distributions. A hash audit found 50/50
+  unique Caltech source images, 15/60 unique LLaVA images, and 19/40 unique
+  receipt images before deduplication. Duplicate removal changed receipt NO@1
+  from a spuriously high approximately 0.925--0.967 range to 0.053--0.368.
+- Centered CKA tracks broader NO@5/NO@10 descriptively, but not NO@1. Only
+  NO@1 predicted transfer in this small 12-pair matrix; that signal requires
+  the independent 200-image confirmation before it is treated as robust.
+- The expanded cross-family analysis has also shown that apparent CKA/NO
+  correlations can be driven by the DINOv2 image-only control. Primary-family
+  results must therefore be reported both with and without that control.
+
+These are descriptive empirical associations, not a causal proof of a transfer
+mechanism and not evidence about proprietary model internals.
+
+## Noise and geometric augmentation status
+
+The standalone `exp/noise-transferability` branch does **not** currently have a
+completed saved trial registry from which a defensible result can be reported.
+Its tracked result document remains intentionally empty. It would be incorrect
+to label the completed geometric-cycle numbers as a completed standalone
+Gaussian/random-noise experiment.
+
+The completed augmentation evidence reported above is therefore labeled
+precisely:
+
+- **Translation EOT** is a completed geometric-augmentation result.
+- **Gaussian** and **Gaussian plus translation** are completed conditions in
+  that same equal-forward augmentation matrix.
+- No completed result presently establishes a variance-matched
+  Gaussian-versus-uniform-versus-Rademacher comparison on the independent noise
+  branch.
+
+The missing noise experiment is an explicit gap: run `none`, single-sample
+Gaussian, variance-matched uniform, variance-matched Rademacher, and two-sample
+Gaussian EOT at equal surrogate-forward budget; then report task-stratified
+held-out ASR and the corresponding local-stability diagnostics. API replay must
+remain a frozen final confirmation rather than a selector.
 
 ## Independent 200-image confirmation
 
@@ -162,9 +211,11 @@ The next experiments required before broader claims are:
 
 1. finish the 200-image confirmation and assess whether frozen rankings hold;
 2. run a family-balanced, leave-SigLIP-family-out surrogate comparison;
-3. repeat frozen baseline/SigLIP/translation/combined conditions on larger
+3. complete the standalone equal-forward Gaussian/uniform/Rademacher noise
+   comparison and its local-stability analysis;
+4. repeat frozen baseline/SigLIP/translation/combined conditions on larger
    caption and VQA sets; keep receipt/OCR separate;
-4. complete the frozen API replay and report its result without revising the
+5. complete the frozen API replay and report its result without revising the
    selected methods.
 
 Generated images, attack outputs, API responses, datasets, checkpoints, keys,
