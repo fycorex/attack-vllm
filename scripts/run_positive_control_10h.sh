@@ -31,12 +31,16 @@ run_pair() {
 }
 
 run_pool() {
-  local proxy="$1" split="$2"; shift 2
-  local -a pairs=("$@")
+  # Items use SPLIT:PAIR_ID.  Keeping development and test work in one queue
+  # prevents the final development item from leaving two GPU workers idle.
+  local proxy="$1"; shift
+  local -a items=("$@")
   local next=0 active=0 pid=""
-  while (( next < ${#pairs[@]} || active > 0 )); do
-    while (( active < 3 && next < ${#pairs[@]} )) && has_attack_time; do
-      run_pair "$proxy" "$split" "${pairs[$next]}" &
+  while (( next < ${#items[@]} || active > 0 )); do
+    while (( active < 3 && next < ${#items[@]} )) && has_attack_time; do
+      local split="${items[$next]%%:*}"
+      local pair="${items[$next]#*:}"
+      run_pair "$proxy" "$split" "$pair" &
       next=$((next + 1)); active=$((active + 1))
     done
     wait -n || true
@@ -48,14 +52,22 @@ run_pool() {
 
 write_status "P2_16"
 # candidate_000 was already completed; candidate_001 is semantically invalid.
-run_pool P2 dev candidate_004 candidate_005 candidate_013 candidate_016
-run_pool P2 test candidate_009 candidate_011 candidate_018 candidate_006 candidate_008 candidate_025 candidate_029 candidate_014 candidate_017
+run_pool P2 \
+  dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
+  test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
+  test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
 
 write_status "P3_16"
-run_pool P3 dev candidate_004 candidate_005 candidate_013 candidate_016
+run_pool P3 \
+  dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
+  test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
+  test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
 
 write_status "P1_16"
-run_pool P1 dev candidate_004 candidate_005 candidate_013 candidate_016
+run_pool P1 \
+  dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
+  test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
+  test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
 
 write_status "replay_completed_images"
 # Attacks are stopped two hours before the deadline.  Replay only generated
