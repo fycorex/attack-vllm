@@ -1,0 +1,22 @@
+# DeBias-Attack adaptation for a strict single Qwen proxy.  The reference
+# branch is a VQAv2 gallery-mean image with fresh weak Gaussian semantics.
+name: DQA16
+epsilon: 0.06274509803921569
+step_size: 0.00392156862745098
+momentum: 0.9
+temperature: 0.10
+local_weight: 0.10
+source_weight: 0.10
+qa_weight: 1.0
+eot_samples: 1
+translation_pixels: 0
+resize_min: 1.0
+resize_max: 1.0
+steps: 300
+restarts: 1
+positive_views: 9
+hard_negative_count: 8
+debias_enabled: true
+debias_beta: 0.50
+reference_noise_std: 0.03
+dataset_rgb_mean: [0.4787966141, 0.4545705574, 0.4131901126]

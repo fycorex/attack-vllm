@@ -1,0 +1,18 @@
+# Question-conditioned, high-budget P1-only track.  The answer NLL is the
+# primary loss; visual alignment is retained only as a transfer regularizer.
+name: QA16
+epsilon: 0.06274509803921569
+step_size: 0.00392156862745098
+momentum: 0.9
+temperature: 0.10
+local_weight: 0.15
+source_weight: 0.10
+qa_weight: 1.0
+eot_samples: 1
+translation_pixels: 0
+resize_min: 1.0
+resize_max: 1.0
+steps: 300
+restarts: 2
+positive_views: 9
+hard_negative_count: 8
