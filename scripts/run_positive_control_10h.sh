@@ -8,7 +8,18 @@ HOURS="${1:-10}"
 OUT="outputs/proxy_selector_pilot/ten_hour_run"
 mkdir -p "$OUT"
 START="$(date +%s)"
-DEADLINE=$((START + HOURS * 3600))
+# A restart can preserve the original wall-clock budget by exporting the
+# absolute deadline recorded in status.json.  Without it, retain the simple
+# user-facing `... 10` interface.
+if [[ -n "${PROXY_SELECTOR_DEADLINE_EPOCH:-}" ]]; then
+  DEADLINE="$PROXY_SELECTOR_DEADLINE_EPOCH"
+else
+  DEADLINE=$((START + HOURS * 3600))
+fi
+if (( DEADLINE <= START + 300 )); then
+  echo "Deadline is too close or already expired: $DEADLINE" >&2
+  exit 2
+fi
 ATTACK_DEADLINE=$((DEADLINE - 2 * 3600))
 
 remaining() { local now; now="$(date +%s)"; echo $(( DEADLINE - now )); }
