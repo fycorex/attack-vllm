@@ -24,10 +24,9 @@ CKA 只比较图像表征，不使用问题文本、生成答案或目标梯度�
 
 每图先做 masked mean pooling 并 L2 归一化：
 
-\[
-z_m(x_i)=\operatorname{L2Norm}\left(
-\frac{\sum_{r=1}^{T} M_{ir}E_{m,r}(x_i)}{\sum_{r=1}^{T}M_{ir}}\right).
-\]
+```text
+z_m(x_i) = L2Normalize( sum_r M_ir * E_m,r(x_i) / sum_r M_ir )
+```
 
 因此当前报告的 CKA 是**图级 global CKA**：它不要求两个模型 embedding 维度相同，也不逐 patch 对齐，而是比较同一批图像在两个模型空间中的相对几何结构。
 
@@ -35,17 +34,14 @@ z_m(x_i)=\operatorname{L2Norm}\left(
 
 对同一顺序的 256 张 gallery 图像，堆叠为 `Z_m∈R^{256×d_m}`，计算：
 
-\[
-K_m=Z_mZ_m^\top,\qquad
-H=I-\frac{1}{n}\mathbf{1}\mathbf{1}^\top,\qquad
-K_m^c=HK_mH,
-\]
+```text
+K_m   = Z_m @ Z_m.T
+H     = I - (1/n) * 1 @ 1.T
+K_m^c = H @ K_m @ H
 
-\[
-\operatorname{CKA}(p,t)=
-\frac{\langle K_p^c,K_t^c\rangle_F}
-{\|K_p^c\|_F\,\|K_t^c\|_F}.
-\]
+CKA(p, t) = frobenius_inner(K_p^c, K_t^c)
+            / (frobenius_norm(K_p^c) * frobenius_norm(K_t^c))
+```
 
 实现细节是：特征以 FP32 保存；CKA 在 CPU FP64 中计算；分母最小截断为 `1e-12`；严格验证 gallery image ID 与顺序完全相同；每个模型对做 100 次按图像重采样 bootstrap，报告 95% percentile 区间。seed 42 的 256 图 gallery 是主 selector 候选，独立的 seed 43 gallery 只检验排名稳定性。两套 gallery 的代理排序 Kendall `τ=1.0`。
 
@@ -59,28 +55,30 @@ K_m^c=HK_mH,
 
 同一个代理的文本编码器产生四个 target concept 模板：`a photo of {answer}`、`an image containing {answer}`、`the visual answer is {answer}`、`Question: {question} Answer: {answer}`。目标语义方向为：
 
-\[
-z_{pos}=\operatorname{Norm}(0.5\,\overline{z}_{image,pos}+0.5\,\overline{z}_{text,pos}),\quad
-z_{neg}=\operatorname{Norm}(\overline{z}_{source+hardneg}),
-\]
-\[
-d_{target}=\operatorname{Norm}(z_{pos}-z_{neg}),\qquad
-d_{adv}=\operatorname{Norm}(g_p(x_{adv})-g_p(x_{clean})).
-\]
+```text
+z_pos    = Normalize(0.5 * mean(target_image_anchor_embeddings)
+                   + 0.5 * mean(same_proxy_target_text_embeddings))
+z_neg    = Normalize(mean(clean_source_and_hard_negative_embeddings))
+d_target = Normalize(z_pos - z_neg)
+d_adv    = Normalize(g_p(x_adv) - g_p(x_clean))
+```
 
 攻击最小化 `L_direction=1-cos(d_adv,d_target)`、`L_endpoint=1-cos(g_p(x_adv),z_pos)`，并在可用的 25%/50%/75%/final/interface 视觉层使用权重 `(0.10,0.15,0.20,0.25,0.30)`。某层不存在则在可用层间重归一化；Qwen 当前只有 interface 层。每层的 global 项为 `1-cos(g_adv^l,target_centroid^l)`；local 项是 adversarial token 与 13 个 anchor token 分别计算对称 max-cosine 匹配再平均：
 
-\[
-M(u,v)=\tfrac12\left[\operatorname{mean}_r\max_s\cos(u_r,v_s)+
-\operatorname{mean}_s\max_r\cos(u_r,v_s)\right].
-\]
+```text
+M(u, v) = 0.5 * [ mean_r max_s cosine(u_r, v_s)
+                + mean_s max_r cosine(u_r, v_s) ]
+```
 
 总损失为：
 
-\[
-L=1.00L_{direction}+0.30L_{endpoint}+0.50\sum_lw_lL_{global}^l+
-0.35\sum_lw_lL_{local}^l+0.15\cos(g_p(x_{adv}),g_p(x_{clean})).
-\]
+```text
+L = 1.00 * L_direction
+  + 0.30 * L_endpoint
+  + 0.50 * sum_l(w_l * L_global[l])
+  + 0.35 * sum_l(w_l * L_local[l])
+  + 0.15 * cosine(g_p(x_adv), g_p(x_clean))
+```
 
 最后一项使 source 表征远离。它结合了 UnivIntruder 的同代理文本语义方向、SGHA 的多参考多深度对齐；VEAttack 则作为独立的非定向 image-token 梯度/PNG sanity check。RaPA 5% 可逆视觉 output-projection pruning 已实现为备用分支，但本表结果使用 `rpa_ratio=0`，避免混淆第一批结果。
 
