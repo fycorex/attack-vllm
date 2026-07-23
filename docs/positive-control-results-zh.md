@@ -1,10 +1,10 @@
 # 单代理跨家族迁移攻击：当前实验结果报告
 
-> 结果快照：2026-07-23 05:28 UTC。此文档报告已经完成并回放的样本；它是初步正向对照，不是统计定论。
+> 结果快照：2026-07-23 11:59 UTC。此文档报告已经完成并回放的样本；它是初步正向对照，不是统计定论。原始图像、VQAv2 数据、模型缓存、攻击 PNG 与 vLLM 原始日志均保持 gitignored；GitHub 只保存可复现实验代码、配置和本结果摘要。
 
 ## 1. 实验问题与口径
 
-问题是：在**每张图只用一个公开代理 checkpoint**、不使用目标梯度、且不以目标输出选择 restart 的条件下，是否能对跨家族 VQA 目标产生定向迁移？代理为 CLIP ViT-L/14（P2）、SigLIP2-So400m（P3）及正在补跑的 Qwen3.5-4B（P1）；目标为 Gemma 4 E2B（T1）和 InternVL3.5-2B（T2）。
+问题是：在**每张图只用一个公开代理 checkpoint**、不使用目标梯度、且不以目标输出选择 restart 的条件下，是否能对跨家族 VQA 目标产生定向迁移？代理为 Qwen3.5-4B（P1）、CLIP ViT-L/14（P2）、SigLIP2-So400m（P3）；目标为 Gemma 4 E2B（T1）和 InternVL3.5-2B（T2）。
 
 主攻击为 `MaxStrengthHierarchicalDirection`：16/255 L∞、300 steps、步长 1/255、momentum=1、5 restarts、8 个可微 EOT 视图；损失结合同代理文本语义方向、13 个目标图像锚点、分层 global/local token 对齐和 source repulsion。详细方法、论文链接和实现边界见 [方法说明](max-strength-positive-control.md)。
 
@@ -127,16 +127,31 @@ L = 1.00 * L_direction
 
 ## 4. 已完成的 16/255 回放结果
 
-每个 P2/P3 单元均已回放 14 张符合筛选条件的图像（5 dev + 9 test）；表中的百分比是 `hit_count / 14`。
+P2/P3 的每个单元均已回放 14 张符合筛选条件的图像（5 dev + 9 test）。P1 完成 13 张：最初的 `candidate_000` 未生成 P1 攻击，其余 4 dev + 9 test 已完成。表中的分母是实际已回放图数，三种代理当前均为**混合 dev/test 的工程批次**，不能作为最终 held-out TASR。
 
 | 单代理 → 黑盒目标 | 严格 targeted transfer | 受控答案改变 | 原始输出改变 | 当前解读 |
 | --- | ---: | ---: | ---: | --- |
+| P1 Qwen → T1 Gemma | 0/13（0.0%） | 4/13（30.8%） | 7/13（53.8%） | 有行为扰动，当前批次未出现严格定向命中。 |
+| P1 Qwen → T2 InternVL | 2/13（15.4%） | 3/13（23.1%） | 7/13（53.8%） | 已有两个严格命中；需 held-out、seed 43 与 8/255 再验证。 |
 | P2 CLIP → T1 Gemma | 0/14（0.0%） | 5/14（35.7%） | 9/14（64.3%） | 有行为扰动，未观察到严格定向命中。 |
 | P2 CLIP → T2 InternVL | 1/14（7.1%） | 5/14（35.7%） | 10/14（71.4%） | 存在单个严格命中，需 seed 43 复现。 |
 | P3 SigLIP2 → T1 Gemma | 2/14（14.3%） | 6/14（42.9%） | 10/14（71.4%） | 已有非零严格迁移，但样本数仍小。 |
 | **P3 SigLIP2 → T2 InternVL** | **6/14（42.9%）** | 6/14（42.9%） | 11/14（78.6%） | 当前最强、可复现前最值得优先诊断的迁移单元。 |
 
-因此，目前可以诚实地说：**单代理定向迁移的正向对照已经出现**，至少在 P3 SigLIP2→T2 InternVL 的 14 张初步样本上为 6/14；但还不能声称这是总体 ASR，也不能将原始输出改变率当成严格 targeted transfer。
+因此，目前可以诚实地说：**单代理定向迁移的正向对照已经出现**。当前最强单元是 P3 SigLIP2→T2 InternVL 的 6/14；P1 Qwen→T2 InternVL 也有 2/13。它们尚不能被称为总体 ASR，且不能将“受控答案改变”或“原始输出改变”当成严格 targeted transfer。
+
+### 4.1 P1 的两个严格命中（T2 InternVL）
+
+| pair | 目标答案 | natural target | clean source | random noise | adversarial source |
+| --- | --- | --- | --- | --- | --- |
+| `candidate_009` | `blue` | `blue` | `gray` | `gray` | `blue` |
+| `candidate_025` | `black` | `black` | `gray` | `gray` | `black` |
+
+两个样本均满足自然目标答对、clean/random 不命中、对抗 PNG 标准化答案精确命中的严格 guard；它们是候选正向样本，仍须在独立随机 seed 与 held-out pair 中检验。
+
+### 4.2 CLIP→Gemma 为零是否主要是数据问题？
+
+针对 P2→T1 的 14 张图，natural target 均答对（14/14），clean source 已输出目标答案为 0/14，matched random-noise 已输出目标答案也为 0/14。因此严格 guard 没有因 clean leakage 排除任何已命中样本。clean 与 random 的非目标答案在 4/14 张上不一致，说明 Gemma 对一部分随机扰动存在回答不稳定性；但 adversarial 在 9/14 张上已改变为**其他非目标答案**、5/14 不变、严格目标命中仍为 0。更重要的是，P3 在同一筛选协议和目标上有 2/14 严格命中。因此当前证据不支持把 P2→T1 的零结果主要归因于 clean-image 一致性或数据泄漏；更合理的候选原因是 CLIP 表征/文本方向与 Gemma 接口的定向对齐不足，需用逐图特征与 loss 诊断检验。
 
 机器可读汇总位于：`outputs/proxy_selector_pilot/positive_control/summaries/transfer_rates.json`；逐图的攻击轨迹、PNG L∞、anchors、方向对齐与耗时位于各自的 `metrics.json`；四种图像条件的原始/标准化 VQA 输出在 `positive_control/vllm/`。
 
@@ -146,14 +161,14 @@ L = 1.00 * L_direction
 
 | 代理 → 目标 | CKA seed 42 | CKA seed 43 | 当前攻击结果 |
 | --- | ---: | ---: | --- |
-| P1 → T1 | 0.839 | 0.830 | P1 尚在补跑。 |
-| P1 → T2 | 0.434 | 0.364 | P1 尚在补跑。 |
+| P1 → T1 | 0.839 | 0.830 | 严格 0/13。 |
+| P1 → T2 | 0.434 | 0.364 | 严格 2/13。 |
 | P3 → T1 | 0.696 | 0.687 | 严格 2/14。 |
 | P3 → T2 | 0.367 | 0.303 | 严格 6/14。 |
 | P2 → T1 | 0.610 | 0.596 | 严格 0/14。 |
 | P2 → T2 | 0.349 | 0.289 | 严格 1/14。 |
 
-一个值得检验的**初步现象**是：在 T2 上，P3 的 CKA 低于 P1，却暂时有最高的观察到的严格 TASR。这既不能证明 CKA 无效，也不能证明 P3 必然最好：P1 尚未完成、每个单元仅 14 张、且攻击损失与代理的文本/局部 token 几何都可能是重要混杂因素。下一步应固定攻击方法、补齐 P1、扩至 20 对/代理并做 seed 43，再计算选择 regret。
+一个值得检验的**初步现象**是：在 T2 上，P3 的 CKA 低于 P1，却有最高的观察到的严格命中（6/14 对 2/13）。这既不能证明 CKA 无效，也不能证明 P3 必然最好：样本量小、分母不完全一致，且攻击损失中的同代理文本编码、局部 token 几何、预处理分辨率和优化稳定性都是混杂因素。当前 CKA 的正确用途是一个待检验的 selector 特征，而不是“CKA 最大必然 transfer 最强”的定律。下一步应固定攻击方法，以相同的 held-out 20 对/代理、seed 43 和 8/255 再计算 selector regret。
 
 CKA 原始文件：`cka/cka_seed42.csv`、`cka/cka_seed43.csv`、`cka/cka_bootstrap.json`。
 
@@ -169,7 +184,7 @@ CKA 原始文件：`cka/cka_seed42.csv`、`cka/cka_seed43.csv`、`cka/cka_bootst
 | [VEAttack（arXiv:2505.17440）](https://arxiv.org/abs/2505.17440) | 单一 LVLM vision encoder；最小化 clean/adv image-token 相似度 | 下游无关、非定向；包含 VQA 性能下降评估 | 文中报告 VQA 性能下降 75.7% | **不是 targeted ASR**。本项目仅用它验证 token 梯度、预处理和 PNG 序列化路径，不能与 TASR 比。 |
 | [SGHA-Attack（arXiv:2602.01574，预印本）](https://arxiv.org/abs/2602.01574) | 多目标参考、多层 global/local 对齐、视觉-文本语义引导 | 黑盒 VLM targeted transfer | 论文称优于既有 targeted baselines；设置与评估集不同 | 本项目保留其多参考和分层对齐思想，但用 VQAv2 真 target 图像与同答案 anchors，不把它的结果与本表做数值比较。 |
 | [Omni-Attack（CVPR 2026）](https://openaccess.thecvf.com/content/CVPR2026/html/Hu_Omni-Attack_Adversarial_Attacks_on_Open-Ended_VQA_in_Black-Box_Multimodal_LLMs_CVPR_2026_paper.html) | question-conditioned text/visual target construction；其最佳实践使用多个 CLIP/SigLIP surrogate 与多视图 | AdvRobustBench 开放式 VQA/OCR，ε=8/255 | GPT-4.1 上最高 71.8% targeted ASR | 是强开放 VQA 参考和潜在上界，但**不是纯单代理**，且目标构造、数据与评审协议不同，不能作为单 proxy 基准。 |
-| **本实验：MaxStrengthHierarchicalDirection** | 每图严格一个 P1/P2/P3 checkpoint；同代理文本方向 + 13 anchors + 多层 global/local token + EOT | VQAv2；ε=16/255；300 steps；5 restarts；8 EOT；Gemma/InternVL | 已完成 P2/P3：P3→T2 严格 6/14=42.9% | 自动短答案 + VQAv2 标准化 **exact match**；target/clean/random 三个 guard 都通过才算成功，是本表最严格的口径之一。 |
+| **本实验：MaxStrengthHierarchicalDirection** | 每图严格一个 P1/P2/P3 checkpoint；同代理文本方向 + 13 anchors + 多层 global/local token + EOT | VQAv2；ε=16/255；300 steps；5 restarts；8 EOT；Gemma/InternVL | 当前混合批次：P3→T2 严格 6/14=42.9%；P1→T2 2/13=15.4% | 自动短答案 + VQAv2 标准化 **exact match**；target/clean/random 三个 guard 都通过才算成功，是本表最严格的口径之一。 |
 
 ### 6.1 对本 pilot 的合理解读阈值
 
@@ -187,9 +202,9 @@ CKA 原始文件：`cka/cka_seed42.csv`、`cka/cka_seed43.csv`、`cka/cka_bootst
 
 ## 7. 当前工程状态与下一步
 
-- **P1/Qwen 攻击正在运行。** 初次运行失败是因为动态分辨率导致不同 anchor 的 image-token 数不同；局部损失已改为逐 anchor 求对齐分数后平均，单样本 Qwen smoke 已通过。P1 的 replay CLI 也已启用。
-- 当前 P1 调度使用同一强攻击配置和 10 小时上限，最后两小时自动回放 T1/T2。
-- P2/P3 之后需在同一对抗样本上跑 8/255，并对严格成功案例以 seed 43 重现。
-- 若 P3→T2 的优势仍保留，应逐图比较 source-target 语义距离、答案类别、局部 token 对齐、global CKA、预处理分辨率、EOT 下的损失稳定性与目标输出稳定性，解释为什么 transferability 不随 global CKA 单调变化。
+- **P1/Qwen 已完成并回放。** 初次运行失败是因为动态分辨率导致不同 anchor 的 image-token 数不同；局部损失已改为逐 anchor 求对齐分数后平均，Qwen smoke 通过后完成 13 张攻击与 T1/T2 回放。
+- 当前没有继续运行的攻击 worker。已完成强攻击的三代理工程批次：P1 13 张、P2/P3 各 14 张。
+- 下一阶段应冻结当前方法，先从 P3→T2 和 P1→T2 的严格命中开始做 seed 43 重现，再做 ε=8/255；随后用彼此一致的 20 个 held-out pairs / proxy 重新汇总严格 TASR、random TASR、Delta TASR 和 CKA selector regret。
+- 若 P3→T2 的优势仍保留，应逐图比较 source-target 语义距离、答案类别、局部 token 对齐、global CKA、预处理分辨率、EOT 下的 loss 稳定性与目标输出稳定性，解释为什么 transferability 不随 global CKA 单调变化。
 
-本报告不会将 P1 未完成、未复现的成功、或弱行为改变写成最终结论。
+本报告不会将混合 dev/test 批次、未以 seed 43 重现的成功，或弱行为改变写成最终结论。
