@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 HOURS="${1:-10}"
+PROXY_SELECTOR_PROXIES="${PROXY_SELECTOR_PROXIES:-P2 P3 P1}"
 OUT="outputs/proxy_selector_pilot/ten_hour_run"
 mkdir -p "$OUT"
 START="$(date +%s)"
@@ -30,6 +31,10 @@ write_status() {
   printf '{"started_epoch":%s,"deadline_epoch":%s,"remaining_seconds":%s,"stage":"%s"}\n' \
     "$START" "$DEADLINE" "$(remaining)" "$1" > "$OUT/status.json.tmp"
   mv "$OUT/status.json.tmp" "$OUT/status.json"
+}
+
+should_run_proxy() {
+  [[ " $PROXY_SELECTOR_PROXIES " == *" $1 "* ]]
 }
 
 run_pair() {
@@ -63,28 +68,34 @@ run_pool() {
 
 write_status "P2_16"
 # candidate_000 was already completed; candidate_001 is semantically invalid.
-run_pool P2 \
-  dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
-  test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
-  test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
+if should_run_proxy P2; then
+  run_pool P2 \
+    dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
+    test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
+    test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
+fi
 
 write_status "P3_16"
-run_pool P3 \
-  dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
-  test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
-  test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
+if should_run_proxy P3; then
+  run_pool P3 \
+    dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
+    test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
+    test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
+fi
 
 write_status "P1_16"
-run_pool P1 \
-  dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
-  test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
-  test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
+if should_run_proxy P1; then
+  run_pool P1 \
+    dev:candidate_004 dev:candidate_005 dev:candidate_013 dev:candidate_016 \
+    test:candidate_009 test:candidate_011 test:candidate_018 test:candidate_006 \
+    test:candidate_008 test:candidate_025 test:candidate_029 test:candidate_014 test:candidate_017
+fi
 
 write_status "replay_completed_images"
 # Attacks are stopped two hours before the deadline.  Replay only generated
 # images; per-item caches make this safe to resume after an interruption.
 if has_time; then
-  for proxy in P2 P3 P1; do
+  for proxy in $PROXY_SELECTOR_PROXIES; do
     has_time || break
     bash scripts/replay_positive_control_batch.sh "$proxy" 42 || true
   done

@@ -150,6 +150,18 @@ def main() -> None:
         pairs = [pair for pair in pairs if pair["pair_id"] in requested]
     if not pairs:
         raise RuntimeError("No positive-control eligible pairs in manifest.")
+    epsilon_root = args.output / "positive_control"
+    if abs(args.epsilon - 16 / 255) > 1e-9:
+        epsilon_root = epsilon_root / f"eps{round(args.epsilon * 255)}"
+    # Check resumability before loading a several-billion-parameter proxy.
+    # This makes a P1-only continuation cheap even when P2/P3 are already done.
+    pairs = [
+        pair for pair in pairs
+        if not (epsilon_root / args.split / args.proxy / f"seed{args.seed}" / pair["pair_id"] / "metrics.json").exists()
+    ]
+    if not pairs:
+        print(f"No pending {args.proxy} {args.split} positive-control pairs; all requested metrics exist.")
+        return
     candidate_path = args.candidates or manifest_path.parent / "candidate_manifest.json"
     candidates = json.loads(candidate_path.read_text())["candidates"]
     model = build_proxy(args.proxy)
@@ -165,13 +177,8 @@ def main() -> None:
     )
     for pair_index, pair in enumerate(pairs):
         question = next(item for item in pair["questions"] if allowed_question(item))
-        epsilon_root = args.output / "positive_control"
-        if abs(args.epsilon - 16 / 255) > 1e-9:
-            epsilon_root = epsilon_root / f"eps{round(args.epsilon * 255)}"
         directory = epsilon_root / args.split / args.proxy / f"seed{args.seed}" / pair["pair_id"]
         report_path = directory / "metrics.json"
-        if report_path.exists():
-            continue
         clean = load_png(Path(pair["source"]["image_path"]), device=model.device)
         target = load_png(Path(pair["target"]["image_path"]), device=model.device)
         excluded = {int(pair["source"]["image_id"]), int(pair["target"]["image_id"])}

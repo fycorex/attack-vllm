@@ -23,7 +23,7 @@ def allowed(question: dict) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--split", choices=("dev", "test"), default="dev")
-    parser.add_argument("--proxy", choices=("P2", "P3"), required=True)
+    parser.add_argument("--proxy", choices=("P1", "P2", "P3"), required=True)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--target", choices=("T1", "T2"), required=True)
     parser.add_argument("--endpoint", required=True)

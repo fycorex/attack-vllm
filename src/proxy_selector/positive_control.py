@@ -45,7 +45,13 @@ def hierarchical_loss(
         output = candidate[name]
         weight = LAYER_WEIGHTS.get(name, 0.0) / normalizer
         global_terms.append(weight * (1.0 - F.cosine_similarity(output.global_features, target_centroids[name], dim=-1).mean()))
-        local_terms.append(weight * local_alignment_loss(output.local_tokens, torch.cat(target_local[name], dim=0)))
+        # Native dynamic-resolution VLMs (notably Qwen) can emit a different
+        # number of valid visual tokens for every target anchor.  Local
+        # alignment is defined per reference, so averaging the individual
+        # scores is equivalent to the fixed-length batch case while avoiding
+        # an invalid concatenation along a variable token dimension.
+        per_anchor = [local_alignment_loss(output.local_tokens, reference) for reference in target_local[name]]
+        local_terms.append(weight * torch.stack(per_anchor).mean())
     return torch.stack(global_terms).sum(), torch.stack(local_terms).sum()
 
 
@@ -108,4 +114,3 @@ def layer_anchor_cache(adapter: object, anchors: list[torch.Tensor]) -> tuple[di
         centroids[name] = normalized_mean([item[name].global_features for item in layers])
         locals_[name] = [item[name].local_tokens for item in layers]
     return centroids, locals_
-
