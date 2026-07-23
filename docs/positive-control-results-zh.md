@@ -120,7 +120,35 @@ L = 1.00 * L_direction
 
 CKA 原始文件：`cka/cka_seed42.csv`、`cka/cka_seed43.csv`、`cka/cka_bootstrap.json`。
 
-## 6. 当前工程状态与下一步
+## 6. 文献对比：哪些数字可以比较，哪些不能直接比较
+
+下表优先采用论文官网、CVF Open Access 或 arXiv 原文。`可直接比较`指是否同时满足“单 checkpoint 代理、跨家族 VLM、VQA、同量级 16/255、严格 exact-answer”——没有任何一篇与本实验完全一致，因此论文 ASR 只能作为方法与量级参考，不能当作本实验应达到的硬阈值。
+
+| 工作（状态） | 代理与方法核心 | 目标/任务与关键设置 | 论文报告数字 | 评分口径与和本实验的关系 |
+| --- | --- | --- | --- | --- |
+| [V-Attack（CVPR 2026；arXiv）](https://arxiv.org/abs/2511.20223) | **单个** CLIP-L/14@336；攻击 attention value features；Self-Value Enhancement + text-guided value manipulation；使用 augmentation | MS-COCO VQA，L∞=16/255，200 steps，crop [0.75,1]；黑盒 LLaVA/InternVL/DeepSeekVL/GPT-4o | 单代理 VQA：LLaVA 54.2%，InternVL 35.2%，DeepSeekVL 24.0%，GPT-4o 39.1% | 最接近我们的“CLIP 单代理→跨家族 VLM”。但 ASR 是 GPT-4o 自动评审三档分数 `1/0.5/0` 的平均，包含部分成功；**不能与 strict exact-answer TASR 直接等同**。 |
+| [UnivIntruder（CCS 2025；arXiv）](https://arxiv.org/abs/2505.19840) | **单个公开 CLIP**；目标文本概念驱动 universal targeted perturbation | 100 个 16/255 样本；Claude-3.5、GPT-4、GPT-4o 的图像分类式短提示 | 全 ASR：80% / 64% / 54%；其中 target-only：52% / 34% / 16% | 论文把 target-only 的 `Deception` 和 source+target 的 `Ambiguity` 都计为成功。它支持“一个公开 CLIP 可迁移”的可行性，但任务与评分宽于 VQAv2 exact answer。 |
+| [RaPA（CVPR 2026）](https://openaccess.thecvf.com/content/CVPR2026/html/Su_RaPA_Enhancing_Transferable_Targeted_Attacks_via_Random_Parameter_Pruning_CVPR_2026_paper.html) | 同一 surrogate checkpoint 的可逆随机参数剪枝；不需要第二个代理 | CNN→Transformer targeted **分类**迁移 | 困难跨架构设置报告约 33.3% ASR，并较当时基线高至 11.7 pp | 不是 VQA，也不提供 strict-answer 对照；本项目只把 2%/5% visual output-projection pruning 作为 P2/P3 仍为零时的可控消融。 |
+| [VEAttack（arXiv:2505.17440）](https://arxiv.org/abs/2505.17440) | 单一 LVLM vision encoder；最小化 clean/adv image-token 相似度 | 下游无关、非定向；包含 VQA 性能下降评估 | 文中报告 VQA 性能下降 75.7% | **不是 targeted ASR**。本项目仅用它验证 token 梯度、预处理和 PNG 序列化路径，不能与 TASR 比。 |
+| [SGHA-Attack（arXiv:2602.01574，预印本）](https://arxiv.org/abs/2602.01574) | 多目标参考、多层 global/local 对齐、视觉-文本语义引导 | 黑盒 VLM targeted transfer | 论文称优于既有 targeted baselines；设置与评估集不同 | 本项目保留其多参考和分层对齐思想，但用 VQAv2 真 target 图像与同答案 anchors，不把它的结果与本表做数值比较。 |
+| [Omni-Attack（CVPR 2026）](https://openaccess.thecvf.com/content/CVPR2026/html/Hu_Omni-Attack_Adversarial_Attacks_on_Open-Ended_VQA_in_Black-Box_Multimodal_LLMs_CVPR_2026_paper.html) | question-conditioned text/visual target construction；其最佳实践使用多个 CLIP/SigLIP surrogate 与多视图 | AdvRobustBench 开放式 VQA/OCR，ε=8/255 | GPT-4.1 上最高 71.8% targeted ASR | 是强开放 VQA 参考和潜在上界，但**不是纯单代理**，且目标构造、数据与评审协议不同，不能作为单 proxy 基准。 |
+| **本实验：MaxStrengthHierarchicalDirection** | 每图严格一个 P1/P2/P3 checkpoint；同代理文本方向 + 13 anchors + 多层 global/local token + EOT | VQAv2；ε=16/255；300 steps；5 restarts；8 EOT；Gemma/InternVL | 已完成 P2/P3：P3→T2 严格 6/14=42.9% | 自动短答案 + VQAv2 标准化 **exact match**；target/clean/random 三个 guard 都通过才算成功，是本表最严格的口径之一。 |
+
+### 6.1 对本 pilot 的合理解读阈值
+
+若最终按原计划使用 12 个独立 test pairs，则单个严格命中对应 8.3 个百分点；当前 P2/P3 的 14 图结果仅是包含 development 的 interim batch，不应用作最终 test-only 结论。
+
+| 严格成功数（12 test pairs） | strict TASR | 适合的解释 |
+| ---: | ---: | --- |
+| 0/12 | 0.0% | 尚未建立定向迁移。 |
+| 1/12 | 8.3% | 候选信号；必须用第二 seed 或独立 pair 复现。 |
+| 2/12 | 16.7% | 已建立可信的非零 single-proxy transfer。 |
+| 3–4/12 | 25.0–33.3% | 对 strict exact-answer、跨 family 的 pilot 已较强；可与 V-Attack 的 InternVL 量级讨论，但必须注明评分不同。 |
+| ≥5/12 | ≥41.7% | 很强；应优先复核 pair screening、clean/random guard、序列化和回答标准化，排除数据泄漏或过宽松匹配。 |
+
+因此本项目的近期目标不是机械追逐“50%”，而是先在 held-out test 上达到至少 2/12 严格命中并以 seed 43 重现；3–4/12 已是有信息量的正向结果。我们当前 P3→T2 的 6/14 是鼓舞信号，但因为混有 dev、还未做 seed 43，不能填入上表的最终 test 判断。
+
+## 7. 当前工程状态与下一步
 
 - **P1/Qwen 攻击正在运行。** 初次运行失败是因为动态分辨率导致不同 anchor 的 image-token 数不同；局部损失已改为逐 anchor 求对齐分数后平均，单样本 Qwen smoke 已通过。P1 的 replay CLI 也已启用。
 - 当前 P1 调度使用同一强攻击配置和 10 小时上限，最后两小时自动回放 T1/T2。
