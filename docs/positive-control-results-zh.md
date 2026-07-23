@@ -49,11 +49,41 @@ CKA(p, t) = frobenius_inner(K_p^c, K_t^c)
 
 ## 3. 攻击方法与全部关键参数
 
+### 3.0 符号、张量形状与“global/local”分别是什么
+
+下表中的 `p` 始终表示**当前这张对抗图唯一使用的代理模型**，即 P1、P2 或 P3 之一；攻击期间不会把两个代理的梯度混合。
+
+| 符号 | 形状 | 代码/数学定义 | 作用 |
+| --- | --- | --- | --- |
+| `x` 或 `x_clean` | `[1, 3, H, W]` | 原始 source RGB 图，范围 `[0,1]` | 扰动中心与负参考。 |
+| `x_adv` | `[1, 3, H, W]` | 优化后的 source 图，满足 `max_abs(x_adv-x_clean) <= epsilon` | 真正提交给黑盒 target 的对抗图。 |
+| `E_p^l(x)` | `[1, T_l, d_l]` | 代理 `p` 在视觉层 `l` 输出的**有效 image tokens**；text tokens 不包含在内 | 所有 global/local 表征的来源。 |
+| `M_p^l(x)` | `[1, T_l]` Boolean | `E` 中哪些 token 属于当前图像且有效 | 动态分辨率/填充时避免把无效 token 平均进去。 |
+| `g_p^l(x)` | `[1, d_l]` | `L2Normalize(masked_mean(E_p^l(x), M_p^l(x)))` | **global 图级特征**：一张图在层 `l` 的单个向量。论文中的 CKA 与 global loss 都使用这种图级几何。省略上标 `l` 的 `g_p(x)` 指最终或接口层的 global 特征。 |
+| `e_p^l(x)` | `[1, T_l, d_l]` | 对 `E_p^l(x)` 的每个有效 token 分别 L2 normalize | **local token 特征**：保留 patch/视觉位置级结构，用于局部匹配。 |
+| `P` | 13 张图 | 正锚点集合：target 自然图、8 个确定性 target views、4 张同答案同题型图 | 定义“应朝向什么视觉概念”。 |
+| `N` | 17 张图 | clean source、8 个 source views、8 个 hard negatives | 定义“应离开什么概念”。 |
+| `a` | 一张锚点图 | `a ∈ P` 或 `a ∈ N` | `g_p^l(a)`、`e_p^l(a)` 是攻击前缓存的常量。 |
+
+对每个有效层，global 特征就是：
+
+```text
+g_p^l(x) = L2Normalize( sum_r M_r * E_p,r^l(x) / sum_r M_r )
+```
+
+而 local 特征是：
+
+```text
+e_p,r^l(x) = E_p,r^l(x) / ||E_p,r^l(x)||_2
+```
+
+因此，“把对抗图拉近 target、推离 source”并不是直接比较像素：global 部分把 `g_p(x_adv)` 拉向 target 图群的中心、远离 `g_p(x_clean)`；local 部分则让 `e_p(x_adv)` 中的视觉 token 与 target anchors 的 token 产生更高的双向匹配。CKA 只报告前者的**跨图全局几何**，不使用 local matching score。
+
 ### 3.1 MaxStrengthHierarchicalDirection 损失
 
 对每个 source-target pair，正锚点有 13 个：自然 target 图像、4 个固定平移视图 `(-4,0),(4,0),(0,-4),(0,4)`、4 个固定缩放视图 `(0.95,0.975,1.025,1.05)`、以及 4 张同标准化答案且同题型的 VQAv2 图像。负锚点为 clean source、它的 8 个确定性视图和 8 张 metadata 选择的 hard negatives。锚点 ID 不使用代理 embedding 或目标攻击结果选择，固定特征在优化前缓存。
 
-同一个代理的文本编码器产生四个 target concept 模板：`a photo of {answer}`、`an image containing {answer}`、`the visual answer is {answer}`、`Question: {question} Answer: {answer}`。目标语义方向为：
+同一个代理的文本编码器产生四个 target concept 模板：`a photo of {answer}`、`an image containing {answer}`、`the visual answer is {answer}`、`Question: {question} Answer: {answer}`。其中 `mean(...)` 是集合中向量的算术平均，`Normalize(...)` 是 L2 归一化；`z_pos` 是目标语义端点、`z_neg` 是 source/hard-negative 端点，`d_target` 是希望扰动沿着移动的单位方向：
 
 ```text
 z_pos    = Normalize(0.5 * mean(target_image_anchor_embeddings)
@@ -63,14 +93,21 @@ d_target = Normalize(z_pos - z_neg)
 d_adv    = Normalize(g_p(x_adv) - g_p(x_clean))
 ```
 
-攻击最小化 `L_direction=1-cos(d_adv,d_target)`、`L_endpoint=1-cos(g_p(x_adv),z_pos)`，并在可用的 25%/50%/75%/final/interface 视觉层使用权重 `(0.10,0.15,0.20,0.25,0.30)`。某层不存在则在可用层间重归一化；Qwen 当前只有 interface 层。每层的 global 项为 `1-cos(g_adv^l,target_centroid^l)`；local 项是 adversarial token 与 13 个 anchor token 分别计算对称 max-cosine 匹配再平均：
+攻击最小化 `L_direction=1-cos(d_adv,d_target)`，故它要求“从 clean 表征到 adversarial 表征的位移”指向 target direction；`L_endpoint=1-cos(g_p(x_adv),z_pos)` 则直接要求 adversarial 图靠近 target semantic endpoint。层 `l` 使用权重 `(0.10,0.15,0.20,0.25,0.30)` 对应 25%/50%/75%/final/interface；缺失层在可用层间重归一化，Qwen 当前只有 interface。每层 global 项为：
+
+```text
+target_centroid_p^l = Normalize( mean_{a in P}( g_p^l(a) ) )
+L_global^l          = 1 - cosine( g_p^l(x_adv), target_centroid_p^l )
+```
+
+每层 local 项是 `x_adv` 的 token 与 13 个 anchor 的 token **逐 anchor**计算对称 max-cosine 后平均；“逐 anchor”尤其重要，因为 Qwen 的动态分辨率使不同图的 token 数 `T_l` 不同：
 
 ```text
 M(u, v) = 0.5 * [ mean_r max_s cosine(u_r, v_s)
                 + mean_s max_r cosine(u_r, v_s) ]
 ```
 
-总损失为：
+所以 `L_local^l = - mean_{a in P}( M(e_p^l(x_adv), e_p^l(a)) )`；负号表示优化时最大化局部匹配。总损失为：
 
 ```text
 L = 1.00 * L_direction
@@ -80,7 +117,7 @@ L = 1.00 * L_direction
   + 0.15 * cosine(g_p(x_adv), g_p(x_clean))
 ```
 
-最后一项使 source 表征远离。它结合了 UnivIntruder 的同代理文本语义方向、SGHA 的多参考多深度对齐；VEAttack 则作为独立的非定向 image-token 梯度/PNG sanity check。RaPA 5% 可逆视觉 output-projection pruning 已实现为备用分支，但本表结果使用 `rpa_ratio=0`，避免混淆第一批结果。
+最后一项是 `L_src=cos(g_p(x_adv),g_p(x_clean))`；最小化它会使 source global 表征远离。它结合了 UnivIntruder 的同代理文本语义方向、SGHA 的多参考多深度对齐；VEAttack 则作为独立的非定向 image-token 梯度/PNG sanity check。RaPA 5% 可逆视觉 output-projection pruning 已实现为备用分支，但本表结果使用 `rpa_ratio=0`，避免混淆第一批结果。
 
 ### 3.2 优化、序列化与数据筛选
 
